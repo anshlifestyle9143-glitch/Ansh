@@ -27,6 +27,7 @@ import com.example.ui.components.VisionHeader
 import com.example.ui.components.VisionTab
 import com.example.ui.screens.ChatScreen
 import com.example.ui.screens.CreatorScreen
+import com.example.ui.screens.DashboardScreen
 import com.example.ui.screens.EnginesScreen
 import com.example.ui.screens.MemoryVaultScreen
 import com.example.ui.theme.VisionBackground
@@ -51,7 +52,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun VisionApp(viewModel: VisionViewModel) {
     val context = LocalContext.current
-    var currentTab by remember { mutableStateOf(VisionTab.CHAT) }
+    var currentTab by remember { mutableStateOf(VisionTab.HOME) }
     var showEngineSheet by remember { mutableStateOf(false) }
     var showHistorySheet by remember { mutableStateOf(false) }
 
@@ -94,6 +95,9 @@ fun VisionApp(viewModel: VisionViewModel) {
                 .padding(innerPadding)
                 .background(VisionBackground)
         ) {
+            when (currentTab) {
+    VisionTab.HOME -> DashboardScreen(viewModel = viewModel, onNavigate = { currentTab = it })
+    VisionTab.CHAT -> ChatScreen(viewModel = viewModel)
             when (currentTab) {
                 VisionTab.CHAT -> ChatScreen(viewModel = viewModel)
                 VisionTab.MEMORY -> MemoryVaultScreen(viewModel = viewModel)
