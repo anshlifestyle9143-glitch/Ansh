@@ -66,6 +66,7 @@ import com.example.ui.theme.VisionTextPrimary
 import com.example.ui.theme.VisionTextSecondary
 import com.example.ui.viewmodel.VisionViewModel
 import kotlin.math.cos
+import androidx.compose.ui.graphics.graphicsLayer
 import kotlin.math.sin
 
 @Composable
