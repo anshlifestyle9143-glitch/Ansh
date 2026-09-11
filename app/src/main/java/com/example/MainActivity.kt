@@ -96,13 +96,26 @@ fun VisionApp(viewModel: VisionViewModel) {
                 .background(VisionBackground)
         ) {
             when (currentTab) {
-    VisionTab.HOME -> DashboardScreen(viewModel = viewModel, onNavigate = { currentTab = it })
-    VisionTab.CHAT -> ChatScreen(viewModel = viewModel)
-            when (currentTab) {
-                VisionTab.CHAT -> ChatScreen(viewModel = viewModel)
-                VisionTab.MEMORY -> MemoryVaultScreen(viewModel = viewModel)
-                VisionTab.ENGINES -> EnginesScreen(viewModel = viewModel)
-                VisionTab.CREATOR -> CreatorScreen(viewModel = viewModel)
+                VisionTab.HOME -> DashboardScreen(
+                    viewModel = viewModel,
+                    onNavigate = { currentTab = it }
+                )
+
+                VisionTab.CHAT -> ChatScreen(
+                    viewModel = viewModel
+                )
+
+                VisionTab.MEMORY -> MemoryVaultScreen(
+                    viewModel = viewModel
+                )
+
+                VisionTab.ENGINES -> EnginesScreen(
+                    viewModel = viewModel
+                )
+
+                VisionTab.CREATOR -> CreatorScreen(
+                    viewModel = viewModel
+                )
             }
         }
     }
