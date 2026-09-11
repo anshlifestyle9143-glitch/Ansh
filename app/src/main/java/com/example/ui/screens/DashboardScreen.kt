@@ -1,5 +1,10 @@
 package com.example.ui.screens
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -10,9 +15,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -20,12 +26,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -41,24 +47,26 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.text.font.FontWeight
 import com.example.ui.components.VisionTab
-import com.example.ui.theme.VisionBorderLight
 import com.example.ui.theme.VisionCardBg
 import com.example.ui.theme.VisionCardBorder
 import com.example.ui.theme.VisionDeepPlum
 import com.example.ui.theme.VisionEmerald
 import com.example.ui.theme.VisionIndigo
 import com.example.ui.theme.VisionLilacLight
-import com.example.ui.theme.VisionLilacPill
 import com.example.ui.theme.VisionTextMuted
 import com.example.ui.theme.VisionTextPrimary
 import com.example.ui.theme.VisionTextSecondary
 import com.example.ui.viewmodel.VisionViewModel
+import kotlin.math.cos
+import kotlin.math.sin
 
 @Composable
 fun DashboardScreen(
@@ -66,20 +74,21 @@ fun DashboardScreen(
     onNavigate: (VisionTab) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val messages by viewModel.messages.collectAsState()
     val memories by viewModel.memories.collectAsState()
     val activeEngine by viewModel.activeEngine.collectAsState()
     var quickPromptInput by remember { mutableStateOf("") }
 
     LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(top = 12.dp, bottom = 90.dp)
+        modifier = modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        contentPadding = PaddingValues(top = 8.dp, bottom = 90.dp)
     ) {
+        // Minimal header
         item {
-            Column(modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+            ) {
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(20.dp))
@@ -88,109 +97,37 @@ fun DashboardScreen(
                         .padding(horizontal = 10.dp, vertical = 4.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(7.dp)
-                                .clip(CircleShape)
-                                .background(VisionEmerald)
-                        )
+                        Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(VisionEmerald))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "SYSTEM LIVE",
-                            color = VisionEmerald,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            letterSpacing = 1.5.sp
-                        )
+                        Text("SYSTEM LIVE", color = VisionEmerald, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.5.sp)
                     }
                 }
-                Spacer(modifier = Modifier.height(14.dp))
-                Text(
-                    text = "Vision",
-                    color = VisionTextPrimary,
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.ExtraBold
-                )
-                Text(
-                    text = "By Ansh Yadav • Personal Neural Assistant",
-                    color = VisionTextMuted,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(top = 2.dp)
-                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(activeEngine.displayName, color = VisionTextMuted, fontSize = 12.sp, fontWeight = FontWeight.Medium)
             }
         }
 
+        // Radial hub — Vision orb + orbiting shortcuts
         item {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(28.dp))
-                    .border(BorderStroke(1.dp, VisionBorderLight.copy(alpha = 0.4f)), RoundedCornerShape(28.dp))
-                    .background(VisionLilacLight)
-            ) {
-                Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(VisionDeepPlum.copy(alpha = 0.15f))
-                                .border(BorderStroke(1.dp, VisionDeepPlum.copy(alpha = 0.3f)), RoundedCornerShape(14.dp)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = VisionDeepPlum, modifier = Modifier.size(20.dp))
-                        }
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(VisionLilacPill)
-                                .border(BorderStroke(1.dp, VisionDeepPlum.copy(alpha = 0.3f)), RoundedCornerShape(12.dp))
-                                .padding(horizontal = 10.dp, vertical = 4.dp)
-                        ) {
-                            Text(text = activeEngine.displayName, color = VisionDeepPlum, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(14.dp))
-                    Text(text = "Neural Core Ready", color = VisionTextPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(text = "Local memory active. How can I assist you today?", color = VisionTextSecondary, fontSize = 13.sp, lineHeight = 18.sp)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            shape = RoundedCornerShape(20.dp),
-                            color = Color.White,
-                            modifier = Modifier.clickable { onNavigate(VisionTab.CHAT) }
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
-                                Icon(Icons.Default.Chat, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Initialize Chat", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                            }
-                        }
-                        Text(text = "${memories.size} Memories Active", color = VisionTextMuted, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                    }
-                }
-            }
+            RadialHub(
+                memoriesCount = memories.size,
+                onCenterClick = { onNavigate(VisionTab.CHAT) },
+                onNavigate = onNavigate
+            )
         }
 
+        // Quick input bar
         item {
             Surface(
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(26.dp),
                 color = VisionCardBg,
                 border = BorderStroke(1.dp, VisionCardBorder),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .padding(horizontal = 24.dp)
+                    .fillMaxWidth()
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     OutlinedTextField(
@@ -221,80 +158,129 @@ fun DashboardScreen(
                     }
                 }
             }
-        }
-
-        item {
-            Text(text = "NEURAL CAPABILITIES", color = VisionTextMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
             Spacer(modifier = Modifier.height(8.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    DashboardFeatureCard("Assistant", "Chat with Vision", Icons.Default.Chat, VisionDeepPlum, VisionDeepPlum.copy(alpha = 0.12f), Modifier.weight(1f)) { onNavigate(VisionTab.CHAT) }
-                    DashboardFeatureCard("Memory Vault", "Encrypted local facts", Icons.Default.Psychology, VisionIndigo, VisionIndigo.copy(alpha = 0.12f), Modifier.weight(1f)) { onNavigate(VisionTab.MEMORY) }
-                }
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    DashboardFeatureCard("AI Engines", "Switch reasoning models", Icons.Default.AutoAwesome, VisionEmerald, VisionEmerald.copy(alpha = 0.12f), Modifier.weight(1f)) { onNavigate(VisionTab.ENGINES) }
-                    DashboardFeatureCard("Vision Info", "About & settings", Icons.Default.Info, VisionTextSecondary, VisionCardBorder, Modifier.weight(1f)) { onNavigate(VisionTab.CREATOR) }
-                }
-            }
-        }
-
-        if (messages.isNotEmpty()) {
-            item {
-                Text(text = "RECENT ACTIVITY", color = VisionTextMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
-                Spacer(modifier = Modifier.height(8.dp))
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = VisionCardBg,
-                    border = BorderStroke(1.dp, VisionCardBorder),
-                    modifier = Modifier.fillMaxWidth().clickable { onNavigate(VisionTab.CHAT) }
-                ) {
-                    Row(modifier = Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(VisionDeepPlum.copy(alpha = 0.12f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Default.Chat, contentDescription = null, tint = VisionDeepPlum, modifier = Modifier.size(18.dp))
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Continue conversation", color = VisionTextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                            Text(text = messages.lastOrNull()?.content?.take(50) ?: "", color = VisionTextSecondary, fontSize = 12.sp, maxLines = 1)
-                        }
-                        Icon(Icons.Default.ArrowForward, contentDescription = null, tint = VisionTextMuted, modifier = Modifier.size(16.dp))
-                    }
-                }
-            }
+            Text(
+                text = "${memories.size} memories active · tap Vision to speak",
+                color = VisionTextMuted,
+                fontSize = 11.sp,
+                modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
         }
     }
 }
 
 @Composable
-fun DashboardFeatureCard(
-    title: String,
-    subtitle: String,
-    icon: ImageVector,
-    accentColor: Color,
-    iconBgColor: Color,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
+private fun RadialHub(
+    memoriesCount: Int,
+    onCenterClick: () -> Unit,
+    onNavigate: (VisionTab) -> Unit
 ) {
-    Surface(
-        shape = RoundedCornerShape(24.dp),
-        color = VisionCardBg,
-        border = BorderStroke(1.dp, VisionCardBorder),
-        modifier = modifier.clickable { onClick() }
+    val satellites = listOf(
+        Triple("Chat", Icons.Default.Chat, VisionDeepPlum) to VisionTab.CHAT,
+        Triple("Memory", Icons.Default.Psychology, VisionIndigo) to VisionTab.MEMORY,
+        Triple("Engines", Icons.Default.Tune, VisionEmerald) to VisionTab.ENGINES,
+        Triple("Info", Icons.Default.Info, VisionTextSecondary) to VisionTab.CREATOR
+    )
+
+    val infiniteTransition = rememberInfiniteTransition(label = "hubPulse")
+    val ringScale by infiniteTransition.animateFloat(
+        initialValue = 0.9f,
+        targetValue = 1.08f,
+        animationSpec = infiniteRepeatable(animation = tween(2200), repeatMode = RepeatMode.Reverse),
+        label = "ringScale"
+    )
+    val glowAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 0.65f,
+        animationSpec = infiniteRepeatable(animation = tween(1800), repeatMode = RepeatMode.Reverse),
+        label = "glowAlpha"
+    )
+
+    Box(
+        modifier = Modifier
+            .size(320.dp)
+            .padding(vertical = 16.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-            Box(
-                modifier = Modifier.size(42.dp).clip(RoundedCornerShape(14.dp)).background(iconBgColor),
-                contentAlignment = Alignment.Center
+        // Outer faint rings
+        Box(
+            modifier = Modifier
+                .size(300.dp)
+                .clip(CircleShape)
+                .border(BorderStroke(1.dp, VisionCardBorder), CircleShape)
+        )
+        Box(
+            modifier = Modifier
+                .size(230.dp)
+                .clip(CircleShape)
+                .border(BorderStroke(1.dp, VisionCardBorder.copy(alpha = 0.7f)), CircleShape)
+        )
+
+        // Pulsing glow behind center orb
+        Box(
+            modifier = Modifier
+                .size(150.dp)
+                .graphicsLayerScale(ringScale)
+                .clip(CircleShape)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(VisionDeepPlum.copy(alpha = glowAlpha), Color.Transparent)
+                    )
+                )
+        )
+
+        // Satellite buttons positioned around the circle
+        val radius = 128f
+        satellites.forEachIndexed { index, (info, tab) ->
+            val (label, icon, accent) = info
+            val angleDeg = -90.0 + (360.0 / satellites.size) * index
+            val angleRad = Math.toRadians(angleDeg)
+            val x = (radius * cos(angleRad)).toFloat().dp
+            val y = (radius * sin(angleRad)).toFloat().dp
+
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .offset(x = x, y = y)
+                    .clickable { onNavigate(tab) }
             ) {
-                Icon(icon, contentDescription = title, tint = accentColor, modifier = Modifier.size(22.dp))
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .background(VisionCardBg)
+                        .border(BorderStroke(1.dp, accent.copy(alpha = 0.4f)), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(icon, contentDescription = label, tint = accent, modifier = Modifier.size(22.dp))
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(label, color = VisionTextSecondary, fontSize = 10.sp, fontWeight = FontWeight.Medium)
             }
-            Spacer(modifier = Modifier.height(14.dp))
-            Text(title, color = VisionTextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(subtitle, color = VisionTextMuted, fontSize = 11.sp, lineHeight = 15.sp)
+        }
+
+        // Center Vision orb
+        Box(
+            modifier = Modifier
+                .size(96.dp)
+                .clip(CircleShape)
+                .background(Brush.radialGradient(colors = listOf(VisionLilacLight, VisionDeepPlum.copy(alpha = 0.3f))))
+                .border(BorderStroke(1.5.dp, VisionDeepPlum.copy(alpha = 0.6f)), CircleShape)
+                .clickable { onCenterClick() },
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(Icons.Default.AutoAwesome, contentDescription = "Vision", tint = Color.White, modifier = Modifier.size(26.dp))
+                Spacer(modifier = Modifier.height(2.dp))
+                Text("Vision", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
         }
     }
 }
+
+private fun Modifier.graphicsLayerScale(scale: Float): Modifier = this.then(
+    Modifier.then(
+        androidx.compose.ui.Modifier.graphicsLayer(scaleX = scale, scaleY = scale)
+    )
+)
