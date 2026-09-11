@@ -17,9 +17,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ChatBubble
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.Tune
@@ -53,6 +55,12 @@ enum class VisionTab(
     val unselectedIcon: ImageVector,
     val testTag: String
 ) {
+    HOME(
+        title = "Home",
+        selectedIcon = Icons.Filled.Home,
+        unselectedIcon = Icons.Outlined.Home,
+        testTag = "nav_tab_home"
+    ),
     CHAT(
         title = "Assistant",
         selectedIcon = Icons.Filled.ChatBubble,
@@ -145,4 +153,3 @@ fun VisionBottomNav(
         }
     }
 }
-
