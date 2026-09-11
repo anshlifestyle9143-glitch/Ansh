@@ -117,60 +117,6 @@ fun DashboardScreen(
             )
         }
 
-        // Quick input bar
-        item {
-            Surface(
-                shape = RoundedCornerShape(26.dp),
-                color = VisionCardBg,
-                border = BorderStroke(1.dp, VisionCardBorder),
-                modifier = Modifier
-                    .padding(horizontal = 24.dp)
-                    .fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    OutlinedTextField(
-                        value = quickPromptInput,
-                        onValueChange = { quickPromptInput = it },
-                        placeholder = { Text("Ask Vision anything...", color = VisionTextMuted, fontSize = 14.sp) },
-                        modifier = Modifier.weight(1f),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color.Transparent,
-                            unfocusedBorderColor = Color.Transparent,
-                            focusedTextColor = VisionTextPrimary,
-                            unfocusedTextColor = VisionTextPrimary
-                        ),
-                        singleLine = true
-                    )
-                    IconButton(
-                        onClick = {
-                            if (quickPromptInput.isNotBlank()) {
-                                val text = quickPromptInput
-                                quickPromptInput = ""
-                                viewModel.sendMessage(text)
-                                onNavigate(VisionTab.CHAT)
-                            }
-                        },
-                        modifier = Modifier.clip(CircleShape).background(Color.White).size(38.dp)
-                    ) {
-                        Icon(Icons.Default.Send, contentDescription = "Send", tint = Color.Black, modifier = Modifier.size(16.dp))
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "${memories.size} memories active · tap Vision to speak",
-                color = VisionTextMuted,
-                fontSize = 11.sp,
-                modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-            )
-        }
-    }
-}
-
 @Composable
 private fun RadialHub(
     memoriesCount: Int,
