@@ -43,10 +43,7 @@ import androidx.compose.ui.unit.sp
 import com.example.ui.theme.VisionCardBorder
 import com.example.ui.theme.VisionDeepPlum
 import com.example.ui.theme.VisionLilacPill
-import com.example.ui.theme.VisionPrimaryPurple
 import com.example.ui.theme.VisionSurface
-import com.example.ui.theme.VisionTextMuted
-import com.example.ui.theme.VisionTextPrimary
 import com.example.ui.theme.VisionTextSecondary
 
 enum class VisionTab(
@@ -61,24 +58,28 @@ enum class VisionTab(
         unselectedIcon = Icons.Outlined.Home,
         testTag = "nav_tab_home"
     ),
+
     CHAT(
         title = "Assistant",
         selectedIcon = Icons.Filled.ChatBubble,
         unselectedIcon = Icons.Outlined.ChatBubbleOutline,
         testTag = "nav_tab_chat"
     ),
+
     MEMORY(
         title = "Memory Vault",
         selectedIcon = Icons.Filled.Psychology,
         unselectedIcon = Icons.Outlined.Psychology,
         testTag = "nav_tab_memory"
     ),
+
     ENGINES(
         title = "AI Engines",
         selectedIcon = Icons.Filled.AutoAwesome,
         unselectedIcon = Icons.Outlined.Tune,
         testTag = "nav_tab_engines"
     ),
+
     CREATOR(
         title = "Vision Info",
         selectedIcon = Icons.Filled.Info,
@@ -95,8 +96,14 @@ fun VisionBottomNav(
 ) {
     Surface(
         color = VisionSurface,
-        border = androidx.compose.foundation.BorderStroke(1.dp, VisionCardBorder.copy(alpha = 0.5f)),
-        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            VisionCardBorder.copy(alpha = 0.5f)
+        ),
+        shape = RoundedCornerShape(
+            topStart = 20.dp,
+            topEnd = 20.dp
+        ),
         modifier = modifier
             .fillMaxWidth()
             .navigationBarsPadding()
@@ -104,49 +111,92 @@ fun VisionBottomNav(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.SpaceAround,
+                .padding(
+                    horizontal = 4.dp,
+                    vertical = 6.dp
+                ),
+            horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
             VisionTab.values().forEach { tab ->
+
                 val isSelected = tab == currentTab
+
                 val iconTint by animateColorAsState(
-                    targetValue = if (isSelected) VisionDeepPlum else VisionTextSecondary,
+                    targetValue = if (isSelected) {
+                        VisionDeepPlum
+                    } else {
+                        VisionTextSecondary
+                    },
                     label = "navTint"
                 )
 
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
+                        .weight(1f)
                         .clip(RoundedCornerShape(14.dp))
-                        .clickable { onTabSelected(tab) }
-                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                        .clickable {
+                            onTabSelected(tab)
+                        }
+                        .padding(
+                            horizontal = 1.dp,
+                            vertical = 2.dp
+                        )
                         .testTag(tab.testTag)
                 ) {
+
                     Box(
                         modifier = Modifier
-                            .size(if (isSelected) 38.dp else 32.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(if (isSelected) VisionLilacPill else Color.Transparent),
+                            .size(
+                                if (isSelected) {
+                                    34.dp
+                                } else {
+                                    30.dp
+                                }
+                            )
+                            .clip(RoundedCornerShape(11.dp))
+                            .background(
+                                if (isSelected) {
+                                    VisionLilacPill
+                                } else {
+                                    Color.Transparent
+                                }
+                            ),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = if (isSelected) tab.selectedIcon else tab.unselectedIcon,
+                            imageVector = if (isSelected) {
+                                tab.selectedIcon
+                            } else {
+                                tab.unselectedIcon
+                            },
                             contentDescription = tab.title,
                             tint = iconTint,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(19.dp)
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(2.dp))
+                    Spacer(
+                        modifier = Modifier.height(2.dp)
+                    )
 
                     Text(
                         text = tab.title,
                         style = MaterialTheme.typography.labelSmall.copy(
-                            fontSize = 10.5.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                            fontSize = 9.sp,
+                            fontWeight = if (isSelected) {
+                                FontWeight.Bold
+                            } else {
+                                FontWeight.Normal
+                            }
                         ),
-                        color = if (isSelected) VisionDeepPlum else VisionTextSecondary
+                        color = if (isSelected) {
+                            VisionDeepPlum
+                        } else {
+                            VisionTextSecondary
+                        },
+                        maxLines = 1
                     )
                 }
             }
