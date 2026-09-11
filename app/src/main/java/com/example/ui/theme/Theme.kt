@@ -2,7 +2,7 @@ package com.example.ui.theme
 
 import android.app.Activity
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.lightColorScheme
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
@@ -10,17 +10,17 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-private val VisionColorScheme = lightColorScheme(
+private val VisionColorScheme = darkColorScheme(
     primary = VisionDeepPlum,
-    onPrimary = Color.White,
+    onPrimary = Color.Black,
     primaryContainer = VisionLilacLight,
     onPrimaryContainer = VisionDeepPlum,
     secondary = VisionPrimaryPurple,
-    onSecondary = Color.White,
+    onSecondary = Color.Black,
     secondaryContainer = VisionLilacPill,
-    onSecondaryContainer = VisionDeepPlum,
+    onSecondaryContainer = VisionPrimaryPurple,
     tertiary = VisionEmerald,
-    onTertiary = Color.White,
+    onTertiary = Color.Black,
     background = VisionBackground,
     onBackground = VisionTextPrimary,
     surface = VisionSurface,
@@ -40,8 +40,8 @@ fun VisionTheme(
             val window = (view.context as Activity).window
             window.statusBarColor = VisionBackground.toArgb()
             window.navigationBarColor = VisionSurface.toArgb()
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = true
-            WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = true
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
+            WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = false
         }
     }
 
@@ -51,4 +51,3 @@ fun VisionTheme(
         content = content
     )
 }
-
