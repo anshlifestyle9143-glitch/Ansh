@@ -30,28 +30,19 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Psychology
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.components.VisionTab
@@ -62,12 +53,11 @@ import com.example.ui.theme.VisionEmerald
 import com.example.ui.theme.VisionIndigo
 import com.example.ui.theme.VisionLilacLight
 import com.example.ui.theme.VisionTextMuted
-import com.example.ui.theme.VisionTextPrimary
 import com.example.ui.theme.VisionTextSecondary
 import com.example.ui.viewmodel.VisionViewModel
 import kotlin.math.cos
-import androidx.compose.ui.graphics.graphicsLayer
 import kotlin.math.sin
+import androidx.compose.ui.graphics.graphicsLayer
 
 @Composable
 fun DashboardScreen(
@@ -77,34 +67,76 @@ fun DashboardScreen(
 ) {
     val memories by viewModel.memories.collectAsState()
     val activeEngine by viewModel.activeEngine.collectAsState()
-    var quickPromptInput by remember { mutableStateOf("") }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
-        contentPadding = PaddingValues(top = 8.dp, bottom = 90.dp)
+        contentPadding = PaddingValues(
+            top = 8.dp,
+            bottom = 90.dp
+        )
     ) {
+
         // Minimal header
         item {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
             ) {
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(20.dp))
-                        .background(VisionEmerald.copy(alpha = 0.12f))
-                        .border(BorderStroke(1.dp, VisionEmerald.copy(alpha = 0.25f)), RoundedCornerShape(20.dp))
-                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                        .background(
+                            VisionEmerald.copy(alpha = 0.12f)
+                        )
+                        .border(
+                            BorderStroke(
+                                1.dp,
+                                VisionEmerald.copy(alpha = 0.25f)
+                            ),
+                            RoundedCornerShape(20.dp)
+                        )
+                        .padding(
+                            horizontal = 10.dp,
+                            vertical = 4.dp
+                        )
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(VisionEmerald))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("SYSTEM LIVE", color = VisionEmerald, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.5.sp)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(VisionEmerald)
+                        )
+
+                        Spacer(
+                            modifier = Modifier.width(6.dp)
+                        )
+
+                        Text(
+                            "SYSTEM LIVE",
+                            color = VisionEmerald,
+                            fontSize = 10.sp,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold,
+                            letterSpacing = 1.5.sp
+                        )
                     }
                 }
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(activeEngine.displayName, color = VisionTextMuted, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+
+                Spacer(
+                    modifier = Modifier.height(6.dp)
+                )
+
+                Text(
+                    activeEngine.displayName,
+                    color = VisionTextMuted,
+                    fontSize = 12.sp,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Medium
+                )
             }
         }
 
@@ -112,10 +144,14 @@ fun DashboardScreen(
         item {
             RadialHub(
                 memoriesCount = memories.size,
-                onCenterClick = { onNavigate(VisionTab.CHAT) },
+                onCenterClick = {
+                    onNavigate(VisionTab.CHAT)
+                },
                 onNavigate = onNavigate
             )
         }
+    }
+}
 
 @Composable
 private fun RadialHub(
@@ -124,23 +160,51 @@ private fun RadialHub(
     onNavigate: (VisionTab) -> Unit
 ) {
     val satellites = listOf(
-        Triple("Chat", Icons.Default.Chat, VisionDeepPlum) to VisionTab.CHAT,
-        Triple("Memory", Icons.Default.Psychology, VisionIndigo) to VisionTab.MEMORY,
-        Triple("Engines", Icons.Default.Tune, VisionEmerald) to VisionTab.ENGINES,
-        Triple("Info", Icons.Default.Info, VisionTextSecondary) to VisionTab.CREATOR
+        Triple(
+            "Chat",
+            Icons.Default.Chat,
+            VisionDeepPlum
+        ) to VisionTab.CHAT,
+
+        Triple(
+            "Memory",
+            Icons.Default.Psychology,
+            VisionIndigo
+        ) to VisionTab.MEMORY,
+
+        Triple(
+            "Engines",
+            Icons.Default.Tune,
+            VisionEmerald
+        ) to VisionTab.ENGINES,
+
+        Triple(
+            "Info",
+            Icons.Default.Info,
+            VisionTextSecondary
+        ) to VisionTab.CREATOR
     )
 
-    val infiniteTransition = rememberInfiniteTransition(label = "hubPulse")
+    val infiniteTransition =
+        rememberInfiniteTransition(label = "hubPulse")
+
     val ringScale by infiniteTransition.animateFloat(
         initialValue = 0.9f,
         targetValue = 1.08f,
-        animationSpec = infiniteRepeatable(animation = tween(2200), repeatMode = RepeatMode.Reverse),
+        animationSpec = infiniteRepeatable(
+            animation = tween(2200),
+            repeatMode = RepeatMode.Reverse
+        ),
         label = "ringScale"
     )
+
     val glowAlpha by infiniteTransition.animateFloat(
         initialValue = 0.35f,
         targetValue = 0.65f,
-        animationSpec = infiniteRepeatable(animation = tween(1800), repeatMode = RepeatMode.Reverse),
+        animationSpec = infiniteRepeatable(
+            animation = tween(1800),
+            repeatMode = RepeatMode.Reverse
+        ),
         label = "glowAlpha"
     )
 
@@ -150,18 +214,33 @@ private fun RadialHub(
             .padding(vertical = 16.dp),
         contentAlignment = Alignment.Center
     ) {
-        // Outer faint rings
+
+        // Outer faint ring
         Box(
             modifier = Modifier
                 .size(300.dp)
                 .clip(CircleShape)
-                .border(BorderStroke(1.dp, VisionCardBorder), CircleShape)
+                .border(
+                    BorderStroke(
+                        1.dp,
+                        VisionCardBorder
+                    ),
+                    CircleShape
+                )
         )
+
+        // Inner faint ring
         Box(
             modifier = Modifier
                 .size(230.dp)
                 .clip(CircleShape)
-                .border(BorderStroke(1.dp, VisionCardBorder.copy(alpha = 0.7f)), CircleShape)
+                .border(
+                    BorderStroke(
+                        1.dp,
+                        VisionCardBorder.copy(alpha = 0.7f)
+                    ),
+                    CircleShape
+                )
         )
 
         // Pulsing glow behind center orb
@@ -172,38 +251,82 @@ private fun RadialHub(
                 .clip(CircleShape)
                 .background(
                     Brush.radialGradient(
-                        colors = listOf(VisionDeepPlum.copy(alpha = glowAlpha), Color.Transparent)
+                        colors = listOf(
+                            VisionDeepPlum.copy(
+                                alpha = glowAlpha
+                            ),
+                            Color.Transparent
+                        )
                     )
                 )
         )
 
-        // Satellite buttons positioned around the circle
+        // Satellite buttons
         val radius = 128f
+
         satellites.forEachIndexed { index, (info, tab) ->
+
             val (label, icon, accent) = info
-            val angleDeg = -90.0 + (360.0 / satellites.size) * index
-            val angleRad = Math.toRadians(angleDeg)
-            val x = (radius * cos(angleRad)).toFloat().dp
-            val y = (radius * sin(angleRad)).toFloat().dp
+
+            val angleDeg =
+                -90.0 + (360.0 / satellites.size) * index
+
+            val angleRad =
+                Math.toRadians(angleDeg)
+
+            val x =
+                (radius * cos(angleRad))
+                    .toFloat()
+                    .dp
+
+            val y =
+                (radius * sin(angleRad))
+                    .toFloat()
+                    .dp
 
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
-                    .offset(x = x, y = y)
-                    .clickable { onNavigate(tab) }
+                    .offset(
+                        x = x,
+                        y = y
+                    )
+                    .clickable {
+                        onNavigate(tab)
+                    }
             ) {
                 Box(
                     modifier = Modifier
                         .size(56.dp)
                         .clip(CircleShape)
                         .background(VisionCardBg)
-                        .border(BorderStroke(1.dp, accent.copy(alpha = 0.4f)), CircleShape),
+                        .border(
+                            BorderStroke(
+                                1.dp,
+                                accent.copy(alpha = 0.4f)
+                            ),
+                            CircleShape
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(icon, contentDescription = label, tint = accent, modifier = Modifier.size(22.dp))
+                    Icon(
+                        icon,
+                        contentDescription = label,
+                        tint = accent,
+                        modifier = Modifier.size(22.dp)
+                    )
                 }
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(label, color = VisionTextSecondary, fontSize = 10.sp, fontWeight = FontWeight.Medium)
+
+                Spacer(
+                    modifier = Modifier.height(4.dp)
+                )
+
+                Text(
+                    label,
+                    color = VisionTextSecondary,
+                    fontSize = 10.sp,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Medium
+                )
             }
         }
 
@@ -212,22 +335,57 @@ private fun RadialHub(
             modifier = Modifier
                 .size(96.dp)
                 .clip(CircleShape)
-                .background(Brush.radialGradient(colors = listOf(VisionLilacLight, VisionDeepPlum.copy(alpha = 0.3f))))
-                .border(BorderStroke(1.5.dp, VisionDeepPlum.copy(alpha = 0.6f)), CircleShape)
-                .clickable { onCenterClick() },
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            VisionLilacLight,
+                            VisionDeepPlum.copy(alpha = 0.3f)
+                        )
+                    )
+                )
+                .border(
+                    BorderStroke(
+                        1.5.dp,
+                        VisionDeepPlum.copy(alpha = 0.6f)
+                    ),
+                    CircleShape
+                )
+                .clickable {
+                    onCenterClick()
+                },
             contentAlignment = Alignment.Center
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Default.AutoAwesome, contentDescription = "Vision", tint = Color.White, modifier = Modifier.size(26.dp))
-                Spacer(modifier = Modifier.height(2.dp))
-                Text("Vision", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    Icons.Default.AutoAwesome,
+                    contentDescription = "Vision",
+                    tint = Color.White,
+                    modifier = Modifier.size(26.dp)
+                )
+
+                Spacer(
+                    modifier = Modifier.height(2.dp)
+                )
+
+                Text(
+                    "Vision",
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                )
             }
         }
     }
 }
 
-private fun Modifier.graphicsLayerScale(scale: Float): Modifier = this.then(
-    Modifier.then(
-        androidx.compose.ui.Modifier.graphicsLayer(scaleX = scale, scaleY = scale)
+private fun Modifier.graphicsLayerScale(
+    scale: Float
+): Modifier =
+    this.then(
+        Modifier.graphicsLayer(
+            scaleX = scale,
+            scaleY = scale
+        )
     )
-)
