@@ -2,35 +2,34 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Artistic Flair Theme Palette
-val VisionBackground = Color(0xFFFDF7FF)
-val VisionSurface = Color(0xFFF3EDF7)
-val VisionCardBg = Color(0xFFFFFFFF)
-val VisionCardBorder = Color(0xFFCAC4D0)
-val VisionBorderLight = Color(0xFFD0BCFF)
+// Obsidian Dark Theme Palette
+val VisionBackground = Color(0xFF050505)
+val VisionSurface = Color(0xFF0C0C0C)
+val VisionCardBg = Color(0xFF121212)
+val VisionCardBorder = Color(0xFF1E1E1E)
+val VisionBorderLight = Color(0xFF2E2E2E)
 
-// Primary & Accent Violet Tones
-val VisionDeepPlum = Color(0xFF21005D)
-val VisionPrimaryPurple = Color(0xFF6750A4)
-val VisionLilacLight = Color(0xFFEADDFF)
-val VisionLilacPill = Color(0xFFE8DEF8)
-val VisionLilacBorder = Color(0xFFD0BCFF)
+// Primary & Accent Indigo Tones
+val VisionDeepPlum = Color(0xFF818CF8)
+val VisionPrimaryPurple = Color(0xFF7DD3FC)
+val VisionLilacLight = Color(0xFF1E1B4B)
+val VisionLilacPill = Color(0xFF16162A)
+val VisionLilacBorder = Color(0xFF2E2E2E)
 
-// Artistic Accents
-val VisionIndigo = Color(0xFF4A4458)
-val VisionEmerald = Color(0xFF386A20)
-val VisionAmber = Color(0xFF7E5700)
-val VisionRose = Color(0xFF9A4058)
-val VisionCyan = Color(0xFF6750A4) // Primary theme tone
+// Accents
+val VisionIndigo = Color(0xFF6366F1)
+val VisionEmerald = Color(0xFF10B981)
+val VisionAmber = Color(0xFFF59E0B)
+val VisionRose = Color(0xFFF43F5E)
+val VisionCyan = Color(0xFF38BDF8)
 
 // Text colors
-val VisionTextPrimary = Color(0xFF1D1B20)
-val VisionTextSecondary = Color(0xFF49454F)
-val VisionTextMuted = Color(0xFF79747E)
+val VisionTextPrimary = Color(0xFFF8FAFC)
+val VisionTextSecondary = Color(0xFF94A3B8)
+val VisionTextMuted = Color(0xFF64748B)
 
 // Bubbles & code blocks
-val VisionUserBubble = Color(0xFF21005D)
-val VisionUserBubbleText = Color(0xFFFDF7FF)
-val VisionAssistantBubble = Color(0xFFFFFFFF)
-val VisionCodeBackground = Color(0xFF1D1B20)
-
+val VisionUserBubble = Color(0xFF4338CA)
+val VisionUserBubbleText = Color(0xFFF8FAFC)
+val VisionAssistantBubble = Color(0xFF121212)
+val VisionCodeBackground = Color(0xFF0A0A0F)
