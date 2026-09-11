@@ -1,0 +1,6 @@
+{
+  "name": "Vision",
+  "description": "Vision is a personal AI assistant created by Ansh Yadav, featuring local memory, modular AI engine architecture, and an artistic flair interface.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
