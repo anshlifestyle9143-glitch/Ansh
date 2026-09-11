@@ -5,6 +5,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -21,12 +23,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -36,22 +34,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.R
 import com.example.data.model.AiEngineType
 import com.example.ui.theme.VisionBackground
 import com.example.ui.theme.VisionCardBorder
 import com.example.ui.theme.VisionDeepPlum
 import com.example.ui.theme.VisionEmerald
-import com.example.ui.theme.VisionLilacLight
-import com.example.ui.theme.VisionLilacPill
 import com.example.ui.theme.VisionPrimaryPurple
-import com.example.ui.theme.VisionTextPrimary
-import com.example.ui.theme.VisionTextSecondary
+import com.example.ui.theme.VisionLilacPill
 
 @Composable
 fun VisionHeader(
@@ -62,6 +60,7 @@ fun VisionHeader(
     modifier: Modifier = Modifier
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+
     val pulseAlpha by infiniteTransition.animateFloat(
         initialValue = 0.5f,
         targetValue = 1.0f,
@@ -84,29 +83,33 @@ fun VisionHeader(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Logo & Title
+
+            // Vision Logo & Title
             Row(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
                     modifier = Modifier
                         .size(38.dp)
-                        .clip(CircleShape)
-                        .background(VisionDeepPlum),
+                        .clip(CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.AutoAwesome,
-                        contentDescription = "Vision Emblem",
-                        tint = Color.White,
-                        modifier = Modifier.size(19.dp)
+                    Image(
+                        painter = painterResource(
+                            id = R.drawable.ic_vision_logo
+                        ),
+                        contentDescription = "Vision Logo",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
                     )
                 }
 
                 Spacer(modifier = Modifier.width(10.dp))
 
                 Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Text(
                             text = "Vision",
                             style = MaterialTheme.typography.titleLarge,
@@ -115,14 +118,19 @@ fun VisionHeader(
                             fontWeight = FontWeight.SemiBold,
                             color = VisionDeepPlum
                         )
+
                         Spacer(modifier = Modifier.width(6.dp))
+
                         Box(
                             modifier = Modifier
                                 .size(6.dp)
                                 .clip(CircleShape)
-                                .background(VisionEmerald.copy(alpha = pulseAlpha))
+                                .background(
+                                    VisionEmerald.copy(alpha = pulseAlpha)
+                                )
                         )
                     }
+
                     Text(
                         text = "BY ANSH YADAV",
                         style = MaterialTheme.typography.labelSmall,
@@ -133,80 +141,45 @@ fun VisionHeader(
                 }
             }
 
-            // Engine Chip & Quick Actions
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // Engine Selector Chip
-                Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = VisionLilacPill,
-                    border = androidx.compose.foundation.BorderStroke(
-                        1.dp,
-                        VisionCardBorder
-                    ),
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .clickable { onEngineClick() }
-                        .testTag("engine_selector_chip")
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Tune,
-                            contentDescription = "Switch Engine",
-                            tint = VisionDeepPlum,
-                            modifier = Modifier.size(13.dp)
-                        )
-                        Spacer(modifier = Modifier.width(5.dp))
-                        Text(
-                            text = activeEngine.displayName,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = VisionDeepPlum
-                        )
+            // Vision Core — Right Side
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = VisionLilacPill,
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    VisionCardBorder
+                ),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(20.dp))
+                    .clickable {
+                        onEngineClick()
                     }
-                }
-
-                Spacer(modifier = Modifier.width(4.dp))
-
-                IconButton(
-                    onClick = onHistoryClick,
-                    modifier = Modifier
-                        .size(36.dp)
-                        .testTag("history_button")
+                    .testTag("engine_selector_chip")
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(
+                        horizontal = 10.dp,
+                        vertical = 6.dp
+                    )
                 ) {
                     Icon(
-                        imageVector = Icons.Default.History,
-                        contentDescription = "Chat Sessions",
-                        tint = VisionTextSecondary,
-                        modifier = Modifier.size(20.dp)
+                        imageVector = Icons.Default.Tune,
+                        contentDescription = "Switch Engine",
+                        tint = VisionDeepPlum,
+                        modifier = Modifier.size(13.dp)
                     )
-                }
 
-                IconButton(
-                    onClick = onNewChatClick,
-                    modifier = Modifier
-                        .size(36.dp)
-                        .testTag("new_chat_button")
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(CircleShape)
-                            .background(VisionLilacLight),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "New Chat",
-                            tint = VisionDeepPlum,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
+                    Spacer(modifier = Modifier.width(5.dp))
+
+                    Text(
+                        text = activeEngine.displayName,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = VisionDeepPlum
+                    )
                 }
             }
         }
     }
 }
-
