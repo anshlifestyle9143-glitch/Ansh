@@ -3,6 +3,7 @@ package com.example
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
@@ -53,6 +54,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun VisionApp(viewModel: VisionViewModel) {
+
     val context = LocalContext.current
 
     var currentTab by remember {
@@ -92,12 +94,51 @@ fun VisionApp(viewModel: VisionViewModel) {
         }
     }
 
+    /*
+     * ANDROID BACK HANDLING
+     *
+     * Priority:
+     * 1. Voice screen -> Home
+     * 2. Engine sheet -> close sheet
+     * 3. History sheet -> close sheet
+     * 4. Any inner screen -> Home
+     * 5. Home -> normal Android back
+     */
+    BackHandler(
+        enabled = showVoiceCall ||
+                showEngineSheet ||
+                showHistorySheet ||
+                currentTab != VisionTab.HOME
+    ) {
+
+        when {
+            showVoiceCall -> {
+                showVoiceCall = false
+            }
+
+            showEngineSheet -> {
+                showEngineSheet = false
+            }
+
+            showHistorySheet -> {
+                showHistorySheet = false
+            }
+
+            currentTab != VisionTab.HOME -> {
+                currentTab = VisionTab.HOME
+                autoStartChatVoice = false
+            }
+        }
+    }
+
     if (showVoiceCall) {
 
         VoiceConversationScreen(
             viewModel = viewModel,
+
             onExit = {
                 showVoiceCall = false
+                currentTab = VisionTab.HOME
             }
         )
 
@@ -108,6 +149,7 @@ fun VisionApp(viewModel: VisionViewModel) {
             containerColor = VisionBackground,
 
             topBar = {
+
                 VisionHeader(
                     activeEngine = activeEngine,
 
@@ -121,6 +163,11 @@ fun VisionApp(viewModel: VisionViewModel) {
 
                     onNewChatClick = {
                         viewModel.createNewSession()
+
+                        // Normal Chat.
+                        // Voice auto-start nahi hoga.
+                        autoStartChatVoice = false
+
                         currentTab = VisionTab.CHAT
                     }
                 )
@@ -137,12 +184,15 @@ fun VisionApp(viewModel: VisionViewModel) {
 
                 when (currentTab) {
 
+                    // ---------------- HOME ----------------
+
                     VisionTab.HOME -> {
+
                         DashboardScreen(
                             viewModel = viewModel,
 
-                            onNavigate = {
-                                currentTab = it
+                            onNavigate = { destination ->
+                                currentTab = destination
                             },
 
                             onStartVoiceCall = {
@@ -154,16 +204,25 @@ fun VisionApp(viewModel: VisionViewModel) {
                             },
 
                             onNewChat = {
-                                viewModel.startNewChat()
-                                autoStartChatVoice = true
+
+                                viewModel.createNewSession()
+
+                                // Home -> Chat
+                                // Voice auto-start nahi hoga.
+                                autoStartChatVoice = false
+
                                 currentTab = VisionTab.CHAT
                             }
                         )
                     }
 
+                    // ---------------- CHAT ----------------
+
                     VisionTab.CHAT -> {
+
                         ChatScreen(
                             viewModel = viewModel,
+
                             autoStartVoice = autoStartChatVoice,
 
                             onAutoStartHandled = {
@@ -172,26 +231,39 @@ fun VisionApp(viewModel: VisionViewModel) {
                         )
                     }
 
+                    // ---------------- MEMORY ----------------
+
                     VisionTab.MEMORY -> {
+
                         MemoryVaultScreen(
                             viewModel = viewModel
                         )
                     }
 
+                    // ---------------- AI ENGINES ----------------
+
                     VisionTab.ENGINES -> {
+
                         EnginesScreen(
                             viewModel = viewModel
                         )
                     }
 
+                    // ---------------- VISION INFO ----------------
+
                     VisionTab.CREATOR -> {
+
                         CreatorScreen(
                             viewModel = viewModel
                         )
                     }
 
+                    // ---------------- SETTINGS ----------------
+
                     VisionTab.SETTINGS -> {
+
                         SettingsScreen(
+
                             onBack = {
                                 currentTab = VisionTab.HOME
                             },
@@ -213,12 +285,16 @@ fun VisionApp(viewModel: VisionViewModel) {
             }
         }
 
+        // ---------------- ENGINE SELECTOR ----------------
+
         if (showEngineSheet) {
 
             EngineSelectorSheet(
+
                 selectedEngine = activeEngine,
 
                 onEngineSelected = { engine ->
+
                     viewModel.setEngine(engine)
                     showEngineSheet = false
                 },
@@ -229,25 +305,38 @@ fun VisionApp(viewModel: VisionViewModel) {
             )
         }
 
+        // ---------------- HISTORY ----------------
+
         if (showHistorySheet) {
 
             SessionDrawerSheet(
+
                 sessions = sessions,
+
                 currentSessionId = currentSessionId,
 
                 onSessionSelected = { sessionId ->
+
                     viewModel.selectSession(sessionId)
+
                     currentTab = VisionTab.CHAT
+
                     showHistorySheet = false
                 },
 
                 onDeleteSession = { sessionId ->
+
                     viewModel.deleteSession(sessionId)
                 },
 
                 onNewSession = {
+
                     viewModel.createNewSession()
+
+                    autoStartChatVoice = false
+
                     currentTab = VisionTab.CHAT
+
                     showHistorySheet = false
                 },
 
