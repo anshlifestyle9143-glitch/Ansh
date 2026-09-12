@@ -248,5 +248,3 @@ fun VisionApp(viewModel: VisionViewModel) {
         }
     }
 }
-
-इसे replace करो → save करो → फिर सिर्फ "Done" बोलना।
