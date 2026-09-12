@@ -33,6 +33,7 @@ import com.example.ui.screens.MemoryVaultScreen
 import com.example.ui.theme.VisionBackground
 import com.example.ui.theme.VisionTheme
 import com.example.ui.viewmodel.VisionViewModel
+import com.example.ui.screens.VoiceConversationScreen
 
 class MainActivity : ComponentActivity() {
 
@@ -53,6 +54,7 @@ class MainActivity : ComponentActivity() {
 fun VisionApp(viewModel: VisionViewModel) {
     val context = LocalContext.current
     var currentTab by remember { mutableStateOf(VisionTab.HOME) }
+    var showVoiceCall by remember { mutableStateOf(false) }
     var showEngineSheet by remember { mutableStateOf(false) }
     var showHistorySheet by remember { mutableStateOf(false) }
 
@@ -98,7 +100,8 @@ fun VisionApp(viewModel: VisionViewModel) {
             when (currentTab) {
                 VisionTab.HOME -> DashboardScreen(
                     viewModel = viewModel,
-                    onNavigate = { currentTab = it }
+                    onNavigate = { currentTab = it },
+                    onStartVoiceCall = { showVoiceCall = true }
                 )
 
                 VisionTab.CHAT -> ChatScreen(
