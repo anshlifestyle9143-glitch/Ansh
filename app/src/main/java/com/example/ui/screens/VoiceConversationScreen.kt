@@ -70,7 +70,7 @@ fun VoiceConversationScreen(
 
         if (!spokenText.isNullOrBlank()) {
             callState = VoiceCallState.THINKING
-            viewModel.sendMessage(overridePrompt = spokenText, autoSpeak = true)
+            viewModel.sendMessage(overridePrompt = spokenText)
         } else {
             callState = VoiceCallState.IDLE
         }
