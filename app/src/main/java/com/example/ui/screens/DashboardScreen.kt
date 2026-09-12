@@ -14,11 +14,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.weight
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChatBubble
@@ -29,16 +31,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberInfiniteTransition
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
@@ -55,8 +55,6 @@ private val NeonBlue = Color(0xFF19CFFF)
 private val ElectricBlue = Color(0xFF3278FF)
 private val NeonPurple = Color(0xFF9B25FF)
 private val DeepPurple = Color(0xFF5415C9)
-private val CoreBlue = Color(0xFF087BFF)
-private val Dark = Color(0xFF02030A)
 private val White = Color(0xFFF5F7FF)
 
 @Composable
@@ -81,8 +79,7 @@ fun DashboardScreen(
 
             Spacer(modifier = Modifier.height(26.dp))
 
-            // SYSTEM LIVE
-            RowSystemLive()
+            SystemLive()
 
             Spacer(modifier = Modifier.height(18.dp))
 
@@ -138,21 +135,13 @@ fun DashboardScreen(
 }
 
 @Composable
-private fun RowSystemLive() {
-    androidx.compose.foundation.layout.Row(
+private fun SystemLive() {
+
+    Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
-        modifier = Modifier
-            .clip(CircleShape)
-            .background(
-                Brush.horizontalGradient(
-                    listOf(
-                        Color(0xFF041B27),
-                        Color(0xFF07121E)
-                    )
-                )
-            )
+        horizontalArrangement = Arrangement.Center
     ) {
+
         Box(
             modifier = Modifier
                 .size(8.dp)
@@ -160,9 +149,7 @@ private fun RowSystemLive() {
                 .background(NeonBlue)
         )
 
-        androidx.compose.foundation.layout.Spacer(
-            modifier = Modifier.size(10.dp)
-        )
+        Spacer(modifier = Modifier.size(10.dp))
 
         Text(
             text = "SYSTEM LIVE",
@@ -183,7 +170,9 @@ private fun VisionRadialCore(
     onHistory: () -> Unit
 ) {
 
-    val transition = rememberInfiniteTransition(label = "vision_orbits")
+    val transition = androidx.compose.animation.core.rememberInfiniteTransition(
+        label = "vision_orbits"
+    )
 
     val rotation by transition.animateFloat(
         initialValue = 0f,
@@ -240,10 +229,6 @@ private fun VisionRadialCore(
         contentAlignment = Alignment.Center
     ) {
 
-        // =========================================================
-        // COMPLETE NEON HUD
-        // =========================================================
-
         Canvas(
             modifier = Modifier.fillMaxSize()
         ) {
@@ -253,29 +238,32 @@ private fun VisionRadialCore(
                 size.height / 2f
             )
 
-            val radius = min(size.width, size.height) / 2f
+            val radius = min(
+                size.width,
+                size.height
+            ) / 2f
 
-            // -----------------------------------------------------
-            // MASSIVE SOFT OUTER GLOW
-            // -----------------------------------------------------
+            // =====================================================
+            // MAIN ATMOSPHERIC GLOW
+            // =====================================================
 
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        NeonPurple.copy(alpha = 0.18f),
-                        ElectricBlue.copy(alpha = 0.08f),
+                        NeonPurple.copy(alpha = 0.24f),
+                        ElectricBlue.copy(alpha = 0.10f),
                         Color.Transparent
                     ),
                     center = center,
-                    radius = radius * 0.98f
+                    radius = radius
                 ),
-                radius = radius * 0.98f,
+                radius = radius,
                 center = center
             )
 
-            // -----------------------------------------------------
-            // OUTER ORBIT - PURPLE
-            // -----------------------------------------------------
+            // =====================================================
+            // OUTER BROKEN ORBIT
+            // =====================================================
 
             drawArc(
                 brush = Brush.sweepGradient(
@@ -294,7 +282,7 @@ private fun VisionRadialCore(
                     center.x - radius * 0.96f,
                     center.y - radius * 0.96f
                 ),
-                size = Size(
+                size = androidx.compose.ui.geometry.Size(
                     radius * 1.92f,
                     radius * 1.92f
                 ),
@@ -319,7 +307,7 @@ private fun VisionRadialCore(
                     center.x - radius * 0.96f,
                     center.y - radius * 0.96f
                 ),
-                size = Size(
+                size = androidx.compose.ui.geometry.Size(
                     radius * 1.92f,
                     radius * 1.92f
                 ),
@@ -329,9 +317,9 @@ private fun VisionRadialCore(
                 )
             )
 
-            // -----------------------------------------------------
+            // =====================================================
             // SECOND ORBIT
-            // -----------------------------------------------------
+            // =====================================================
 
             drawArc(
                 brush = Brush.sweepGradient(
@@ -349,7 +337,7 @@ private fun VisionRadialCore(
                     center.x - radius * 0.78f,
                     center.y - radius * 0.78f
                 ),
-                size = Size(
+                size = androidx.compose.ui.geometry.Size(
                     radius * 1.56f,
                     radius * 1.56f
                 ),
@@ -360,7 +348,7 @@ private fun VisionRadialCore(
             )
 
             drawArc(
-                color = NeonPurple.copy(alpha = 0.65f),
+                color = NeonPurple.copy(alpha = 0.75f),
                 startAngle = 250f,
                 sweepAngle = 75f,
                 useCenter = false,
@@ -368,7 +356,7 @@ private fun VisionRadialCore(
                     center.x - radius * 0.78f,
                     center.y - radius * 0.78f
                 ),
-                size = Size(
+                size = androidx.compose.ui.geometry.Size(
                     radius * 1.56f,
                     radius * 1.56f
                 ),
@@ -378,9 +366,9 @@ private fun VisionRadialCore(
                 )
             )
 
-            // -----------------------------------------------------
-            // THIRD ORBIT
-            // -----------------------------------------------------
+            // =====================================================
+            // THIRD INNER ORBIT
+            // =====================================================
 
             drawArc(
                 brush = Brush.sweepGradient(
@@ -398,7 +386,7 @@ private fun VisionRadialCore(
                     center.x - radius * 0.59f,
                     center.y - radius * 0.59f
                 ),
-                size = Size(
+                size = androidx.compose.ui.geometry.Size(
                     radius * 1.18f,
                     radius * 1.18f
                 ),
@@ -408,9 +396,9 @@ private fun VisionRadialCore(
                 )
             )
 
-            // -----------------------------------------------------
+            // =====================================================
             // INNER CORE RING
-            // -----------------------------------------------------
+            // =====================================================
 
             drawCircle(
                 brush = Brush.sweepGradient(
@@ -427,14 +415,14 @@ private fun VisionRadialCore(
                 )
             )
 
-            // -----------------------------------------------------
-            // CORE PURPLE GLOW
-            // -----------------------------------------------------
+            // =====================================================
+            // INNER PURPLE GLOW
+            // =====================================================
 
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        NeonPurple.copy(alpha = 0.40f),
+                        NeonPurple.copy(alpha = 0.42f),
                         DeepPurple.copy(alpha = 0.22f),
                         Color.Transparent
                     ),
@@ -445,9 +433,9 @@ private fun VisionRadialCore(
                 center = center
             )
 
-            // -----------------------------------------------------
-            // ORBIT PARTICLES
-            // -----------------------------------------------------
+            // =====================================================
+            // PARTICLES
+            // =====================================================
 
             val particles = listOf(
                 18f to 0.69f,
@@ -465,19 +453,14 @@ private fun VisionRadialCore(
 
             particles.forEachIndexed { index, pair ->
 
-                val angle =
-                    Math.toRadians(
-                        pair.first.toDouble()
-                    ).toFloat()
+                val angle = Math.toRadians(
+                    pair.first.toDouble()
+                ).toFloat()
 
-                val distance =
-                    radius * pair.second
+                val distance = radius * pair.second
 
-                val x =
-                    center.x + cos(angle) * distance
-
-                val y =
-                    center.y + sin(angle) * distance
+                val x = center.x + cos(angle) * distance
+                val y = center.y + sin(angle) * distance
 
                 val particleColor =
                     if (index % 2 == 0) {
@@ -499,25 +482,26 @@ private fun VisionRadialCore(
                 )
 
                 if (index % 3 == 0) {
+
                     drawCircle(
-                        color = particleColor.copy(alpha = 0.14f),
+                        color = particleColor.copy(
+                            alpha = 0.14f
+                        ),
                         radius = 9.dp.toPx(),
                         center = Offset(x, y)
                     )
                 }
             }
 
-            // -----------------------------------------------------
-            // SMALL ORBITING ELECTRON
-            // -----------------------------------------------------
+            // =====================================================
+            // MOVING ELECTRON
+            // =====================================================
 
-            val electronAngle =
-                Math.toRadians(
-                    rotation.toDouble()
-                ).toFloat()
+            val electronAngle = Math.toRadians(
+                rotation.toDouble()
+            ).toFloat()
 
-            val electronDistance =
-                radius * 0.73f
+            val electronDistance = radius * 0.73f
 
             val electron = Offset(
                 center.x +
@@ -542,7 +526,7 @@ private fun VisionRadialCore(
         }
 
         // =========================================================
-        // CENTRAL VISION CORE
+        // CENTRAL VISION SPHERE
         // =========================================================
 
         Box(
@@ -555,10 +539,9 @@ private fun VisionRadialCore(
             contentAlignment = Alignment.Center
         ) {
 
-            // Outer glow
             Box(
                 modifier = Modifier
-                    .matchParentSize()
+                    .fillMaxSize()
                     .clip(CircleShape)
                     .background(
                         Brush.radialGradient(
@@ -571,14 +554,8 @@ private fun VisionRadialCore(
                     )
             )
 
-            // =====================================================
-            // 3D DIGITAL SPHERE
-            // =====================================================
-
             Canvas(
-                modifier = Modifier
-                    .size(132.dp)
-                    .align(Alignment.Center)
+                modifier = Modifier.size(136.dp)
             ) {
 
                 val c = Offset(
@@ -588,7 +565,10 @@ private fun VisionRadialCore(
 
                 val r = size.minDimension / 2f
 
-                // sphere glow
+                // -------------------------------------------------
+                // SPHERE GLOW
+                // -------------------------------------------------
+
                 drawCircle(
                     brush = Brush.radialGradient(
                         colors = listOf(
@@ -601,7 +581,10 @@ private fun VisionRadialCore(
                     center = c
                 )
 
-                // globe boundary
+                // -------------------------------------------------
+                // SPHERE OUTLINE
+                // -------------------------------------------------
+
                 drawCircle(
                     brush = Brush.sweepGradient(
                         listOf(
@@ -618,14 +601,21 @@ private fun VisionRadialCore(
                     )
                 )
 
-                // horizontal latitude lines
+                // -------------------------------------------------
+                // LATITUDE LINES
+                // -------------------------------------------------
+
                 for (i in -3..3) {
 
                     val yOffset =
                         i * r * 0.18f
 
                     val ellipseHeight =
-                        r * (0.30f + (3 - kotlin.math.abs(i)) * 0.07f)
+                        r * (
+                            0.30f +
+                                    (3 - kotlin.math.abs(i)) *
+                                    0.07f
+                            )
 
                     drawOval(
                         color = NeonBlue.copy(
@@ -633,253 +623,13 @@ private fun VisionRadialCore(
                         ),
                         topLeft = Offset(
                             c.x - r * 0.72f,
-                            c.y + yOffset - ellipseHeight / 2
+                            c.y +
+                                    yOffset -
+                                    ellipseHeight / 2f
                         ),
-                        size = Size(
+                        size = androidx.compose.ui.geometry.Size(
                             r * 1.44f,
                             ellipseHeight
                         ),
                         style = Stroke(
-                            width = 1.dp.toPx()
-                        )
-                    )
-                }
-
-                // vertical longitude lines
-                for (i in -2..2) {
-
-                    val xOffset =
-                        i * r * 0.22f
-
-                    drawOval(
-                        color = NeonPurple.copy(
-                            alpha = 0.55f
-                        ),
-                        topLeft = Offset(
-                            c.x + xOffset - r * 0.20f,
-                            c.y - r * 0.76f
-                        ),
-                        size = Size(
-                            r * 0.40f,
-                            r * 1.52f
-                        ),
-                        style = Stroke(
-                            width = 1.dp.toPx()
-                        )
-                    )
-                }
-
-                // sphere particles
-                for (i in 0 until 26) {
-
-                    val angle =
-                        Math.toRadians(
-                            (i * 47 % 360).toDouble()
-                        ).toFloat()
-
-                    val d =
-                        r * (
-                                0.35f +
-                                        ((i * 13) % 45) /
-                                        100f
-                                )
-
-                    drawCircle(
-                        color =
-                            if (i % 2 == 0) {
-                                NeonBlue
-                            } else {
-                                NeonPurple
-                            },
-                        radius = 1.3.dp.toPx(),
-                        center = Offset(
-                            c.x + cos(angle) * d,
-                            c.y + sin(angle) * d
-                        )
-                    )
-                }
-
-                // =================================================
-                // BIG V
-                // =================================================
-
-                val vPath =
-                    androidx.compose.ui.graphics.Path().apply {
-
-                        moveTo(
-                            c.x - r * 0.43f,
-                            c.y - r * 0.40f
-                        )
-
-                        lineTo(
-                            c.x,
-                            c.y + r * 0.46f
-                        )
-
-                        lineTo(
-                            c.x + r * 0.43f,
-                            c.y - r * 0.40f
-                        )
-                    }
-
-                drawPath(
-                    path = vPath,
-                    color = NeonBlue.copy(alpha = 0.20f),
-                    style = Stroke(
-                        width = 8.dp.toPx(),
-                        cap = StrokeCap.Round
-                    )
-                )
-
-                drawPath(
-                    path = vPath,
-                    brush = Brush.verticalGradient(
-                        listOf(
-                            NeonBlue,
-                            Color(0xFF75E8FF),
-                            ElectricBlue
-                        )
-                    ),
-                    style = Stroke(
-                        width = 4.dp.toPx(),
-                        cap = StrokeCap.Round
-                    )
-                )
-            }
-        }
-
-        // =========================================================
-        // CHAT - TOP
-        // =========================================================
-
-        RadialAction(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .offset(y = (-8).dp),
-            icon = Icons.Default.ChatBubble,
-            title = "CHAT",
-            onClick = onChat
-        )
-
-        // =========================================================
-        // SETTINGS - LEFT
-        // =========================================================
-
-        RadialAction(
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .offset(x = (-3).dp),
-            icon = Icons.Default.Settings,
-            title = "SETTINGS",
-            onClick = onSettings
-        )
-
-        // =========================================================
-        // VOICE - RIGHT
-        // =========================================================
-
-        RadialAction(
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .offset(x = 3.dp),
-            icon = Icons.Default.Mic,
-            title = "VOICE",
-            onClick = onVoice
-        )
-
-        // =========================================================
-        // HISTORY - BOTTOM
-        // =========================================================
-
-        RadialAction(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .offset(y = 5.dp),
-            icon = Icons.Default.History,
-            title = "HISTORY",
-            onClick = onHistory
-        )
-    }
-}
-
-@Composable
-private fun RadialAction(
-    modifier: Modifier,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    title: String,
-    onClick: () -> Unit
-) {
-
-    Column(
-        modifier = modifier
-            .clickable { onClick() },
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-
-        Box(
-            modifier = Modifier
-                .size(70.dp)
-                .shadow(
-                    elevation = 18.dp,
-                    shape = CircleShape,
-                    ambientColor = NeonPurple,
-                    spotColor = NeonBlue
-                )
-                .clip(CircleShape)
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(
-                            Color(0xFF172D92),
-                            Color(0xFF0A0C35),
-                            Color(0xFF08001A)
-                        )
-                    )
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-
-            Canvas(
-                modifier = Modifier.matchParentSize()
-            ) {
-
-                drawCircle(
-                    brush = Brush.sweepGradient(
-                        listOf(
-                            NeonBlue,
-                            NeonPurple,
-                            NeonBlue
-                        )
-                    ),
-                    radius = size.minDimension / 2f - 1.dp.toPx(),
-                    style = Stroke(
-                        width = 2.dp.toPx()
-                    )
-                )
-
-                drawCircle(
-                    color = NeonBlue.copy(alpha = 0.12f),
-                    radius = size.minDimension * 0.38f
-                )
-            }
-
-            Icon(
-                imageVector = icon,
-                contentDescription = title,
-                tint = White,
-                modifier = Modifier.size(31.dp)
-            )
-        }
-
-        Spacer(
-            modifier = Modifier.height(7.dp)
-        )
-
-        Text(
-            text = title,
-            color = White,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 1.5.sp
-        )
-    }
-}
+                            widt
