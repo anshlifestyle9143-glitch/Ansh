@@ -215,6 +215,15 @@ fun CreatorScreen(
                     ) {
                         Text("Sign Out")
                     }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = { viewModel.restoreFromCloud() },
+                        colors = ButtonDefaults.buttonColors(containerColor = VisionEmerald, contentColor = Color.White),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Restore from Cloud")
+                    }
                 } else {
                     Text("Sign in to sync memory across devices", color = VisionTextSecondary, style = MaterialTheme.typography.bodySmall)
                     Spacer(modifier = Modifier.height(10.dp))
