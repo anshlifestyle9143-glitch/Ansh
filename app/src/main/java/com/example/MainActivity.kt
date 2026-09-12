@@ -108,7 +108,7 @@ fun VisionApp(viewModel: VisionViewModel) {
                         viewModel = viewModel,
                         onNavigate = { currentTab = it },
                         onStartVoiceCall = { showVoiceCall = true },
-                        onNewChat = { viewModel.createNewSession() },
+                        onNewChat = { viewModel.startNewChat() }
                         onShowHistory = { showHistorySheet = true }
                     )
 
