@@ -39,7 +39,6 @@ class VisionRepository(private val dao: VisionDao) {
                     activeEngineId = engineId
                 )
             )
-            // Insert greeting
             dao.insertMessage(
                 ChatMessage(
                     sessionId = sessionId,
@@ -128,7 +127,7 @@ class VisionRepository(private val dao: VisionDao) {
             -1
         }
     }
-    
+
     suspend fun clearAllData() {
         withContext(Dispatchers.IO) {
             dao.clearAllMessages()
@@ -141,63 +140,6 @@ class VisionRepository(private val dao: VisionDao) {
         return AiEngineType.values().find { it.id == id } ?: AiEngineType.VISION_CORE
     }
 
-    private fun pushMessageToCloud(message: ChatMessage) {
-        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
-        val data = hashMapOf(
-            "sessionId" to message.sessionId,
-            "role" to message.role,
-            "content" to message.content,
-            "timestamp" to message.timestamp,
-            "engineName" to message.engineName
-        )
-        FirebaseFirestore.getInstance()
-            .collection("users").document(uid)
-            .collection("messages")
-            .add(data)
-    }
-
-    private suspend fun saveMessage(message: ChatMessage): Long {
-        val id = dao.insertMessage(message)
-        pushMessageToCloud(message)
-        return id
-    }
-
-    suspend fun restoreFromCloud(): Int {
-        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return -1
-        return try {
-            val snapshot = FirebaseFirestore.getInstance()
-                .collection("users").document(uid)
-                .collection("messages")
-                .orderBy("timestamp")
-                .get()
-                .await()
-
-            if (snapshot.isEmpty) return 0
-
-            val sessionId = dao.insertSession(ChatSession(title = "Restored from Cloud"))
-            var count = 0
-            for (doc in snapshot.documents) {
-                val content = doc.getString("content") ?: continue
-                val role = doc.getString("role") ?: "USER"
-                val timestamp = doc.getLong("timestamp") ?: System.currentTimeMillis()
-                val engineName = doc.getString("engineName") ?: "Vision Core"
-                dao.insertMessage(
-                    ChatMessage(
-                        sessionId = sessionId,
-                        role = role,
-                        content = content,
-                        timestamp = timestamp,
-                        engineName = engineName
-                    )
-                )
-                count++
-            }
-            count
-        } catch (e: Exception) {
-            -1
-        }
-    }
-    
     suspend fun sendMessage(
         sessionId: Long,
         userPrompt: String,
@@ -207,7 +149,6 @@ class VisionRepository(private val dao: VisionDao) {
     ): Result<ChatMessage> = withContext(Dispatchers.IO) {
         val startTime = System.currentTimeMillis()
 
-        // 1. Save User Message
         val userMessage = ChatMessage(
             sessionId = sessionId,
             role = "USER",
@@ -215,13 +156,11 @@ class VisionRepository(private val dao: VisionDao) {
             engineName = engineType.displayName,
             timestamp = System.currentTimeMillis()
         )
-        dao.saveMessage(userMessage)
+        saveMessage(userMessage)
 
-        // 2. Fetch conversation history & active memories for context
         val recentHistory = dao.getRecentMessages(sessionId, limit = 8).reversed()
         val activeMemories = dao.getActiveMemories()
 
-        // 3. Build System Instruction with Local Memory Context
         val memoryContext = buildString {
             append("Tum \"Vision\" ho — ek advanced AI companion, jise Ansh Yadav ne banaya hai.\n")
             append("Tum hamesha khud ko female (ladki) ki tarah refer karti ho — feminine Hindi grammar use karo (jaise \"kar rahi hoon\", \"main samajh rahi hoon\") — kabhi male form use mat karo.\n")
@@ -240,7 +179,6 @@ class VisionRepository(private val dao: VisionDao) {
             }
         }
 
-        // 4. If offline engine selected or offline, execute local on-device intelligence
         if (engineType == AiEngineType.VISION_OFFLINE) {
             val localResponse = generateLocalOfflineResponse(userPrompt, activeMemories)
             val latency = System.currentTimeMillis() - startTime
@@ -251,15 +189,13 @@ class VisionRepository(private val dao: VisionDao) {
                 engineName = engineType.displayName,
                 latencyMs = latency
             )
-            dao.saveMessage(assistantMsg)
+            saveMessage(assistantMsg)
             return@withContext Result.success(assistantMsg)
         }
 
-        // 5. Build Remote Gemini Request
         val apiKey = if (!customApiKey.isNullOrBlank()) customApiKey else VisionRetrofitClient.getApiKey()
 
         if (apiKey.isBlank() || apiKey == "MY_GEMINI_API_KEY") {
-            // Smart simulated local engine fallback when API key is unconfigured
             val fallbackResponse = generateLocalOfflineResponse(userPrompt, activeMemories)
             val latency = System.currentTimeMillis() - startTime
             val assistantMsg = ChatMessage(
@@ -269,7 +205,7 @@ class VisionRepository(private val dao: VisionDao) {
                 engineName = "${engineType.displayName} (Local Fallback)",
                 latencyMs = latency
             )
-            dao.saveMessage(assistantMsg)
+            saveMessage(assistantMsg)
             return@withContext Result.success(assistantMsg)
         }
 
@@ -315,9 +251,8 @@ class VisionRepository(private val dao: VisionDao) {
                 engineName = engineType.displayName,
                 latencyMs = latency
             )
-            dao.saveMessage(assistantMsg)
+            saveMessage(assistantMsg)
 
-            // Also check if user asked to remember something and auto-store it
             checkAndAutoRemember(userPrompt, text, dao)
 
             Result.success(assistantMsg)
@@ -332,7 +267,7 @@ class VisionRepository(private val dao: VisionDao) {
                 engineName = "${engineType.displayName} (Adaptive)",
                 latencyMs = latency
             )
-            dao.saveMessage(assistantMsg)
+            saveMessage(assistantMsg)
             Result.success(assistantMsg)
         }
     }
