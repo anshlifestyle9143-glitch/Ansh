@@ -96,7 +96,6 @@ class VisionViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun createNewSession(title: String = "Neural Stream #${System.currentTimeMillis().toString().takeLast(4)}") {
-    fun createNewSession(title: String = "Neural Stream #${System.currentTimeMillis().toString().takeLast(4)}") {
         viewModelScope.launch {
             val newId = repository.createNewSession(title, _activeEngine.value.id)
             _currentSessionId.value = newId
