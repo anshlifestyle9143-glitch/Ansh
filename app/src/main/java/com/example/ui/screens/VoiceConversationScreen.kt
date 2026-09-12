@@ -1,8 +1,7 @@
 package com.example.ui.screens
 
-import android.app.Activity
-import android.content.Intent
-import android.speech.RecognizerIntent
+import android.Manifest
+import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.RepeatMode
@@ -26,6 +25,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -38,8 +38,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.example.ui.theme.VisionBackground
 import com.example.ui.theme.VisionDeepPlum
 import com.example.ui.theme.VisionEmerald
@@ -47,51 +49,63 @@ import com.example.ui.theme.VisionIndigo
 import com.example.ui.theme.VisionTextPrimary
 import com.example.ui.theme.VisionTextSecondary
 import com.example.ui.viewmodel.VisionViewModel
-import java.util.Locale
+import com.example.util.LiveSpeechRecognizer
 
-private enum class VoiceCallState { IDLE, LISTENING, THINKING, SPEAKING }
+private enum class VoiceCallState { IDLE, LISTENING, THINKING, SPEAKING, NO_PERMISSION }
 
 @Composable
 fun VoiceConversationScreen(
     viewModel: VisionViewModel,
     onExit: () -> Unit
 ) {
+    val context = LocalContext.current
     val isGenerating by viewModel.isGenerating.collectAsState()
     val isSpeaking by viewModel.ttsManager.isSpeaking.collectAsState()
     var callState by remember { mutableStateOf(VoiceCallState.IDLE) }
     var active by remember { mutableStateOf(true) }
 
-    val speechLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        val spokenText = if (result.resultCode == Activity.RESULT_OK) {
-            result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
-        } else null
+    val speechRecognizer = remember { LiveSpeechRecognizer(context) }
 
-        if (!spokenText.isNullOrBlank()) {
-            callState = VoiceCallState.THINKING
-            viewModel.sendMessage(overridePrompt = spokenText)
-        } else {
-            callState = VoiceCallState.IDLE
-        }
+    DisposableEffect(Unit) {
+        onDispose { speechRecognizer.destroy() }
     }
 
     fun startListening() {
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
-            putExtra(RecognizerIntent.EXTRA_PROMPT, "Vision is listening...")
-        }
-        try {
-            callState = VoiceCallState.LISTENING
-            speechLauncher.launch(intent)
-        } catch (e: Exception) {
-            callState = VoiceCallState.IDLE
+        speechRecognizer.start(
+            onPartial = {},
+            onFinal = { text ->
+                callState = VoiceCallState.THINKING
+                viewModel.sendMessage(overridePrompt = text, autoSpeak = true)
+            },
+            onListeningChange = { listening ->
+                if (listening) callState = VoiceCallState.LISTENING
+            },
+            onError = {
+                if (active) callState = VoiceCallState.IDLE
+            }
+        )
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) startListening() else callState = VoiceCallState.NO_PERMISSION
+    }
+
+    fun requestListening() {
+        val hasPermission = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (hasPermission) {
+            startListening()
+        } else {
+            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
 
     LaunchedEffect(Unit) {
-        startListening()
+        requestListening()
     }
 
     LaunchedEffect(isGenerating) {
@@ -102,7 +116,7 @@ fun VoiceConversationScreen(
         if (isSpeaking) {
             callState = VoiceCallState.SPEAKING
         } else if (callState == VoiceCallState.SPEAKING && active) {
-            startListening()
+            requestListening()
         }
     }
 
@@ -118,7 +132,7 @@ fun VoiceConversationScreen(
         VoiceCallState.LISTENING -> VisionDeepPlum
         VoiceCallState.THINKING -> VisionEmerald
         VoiceCallState.SPEAKING -> VisionIndigo
-        VoiceCallState.IDLE -> VisionDeepPlum.copy(alpha = 0.5f)
+        VoiceCallState.IDLE, VoiceCallState.NO_PERMISSION -> VisionDeepPlum.copy(alpha = 0.5f)
     }
 
     Box(
@@ -130,7 +144,7 @@ fun VoiceConversationScreen(
                 modifier = Modifier
                     .size(180.dp)
                     .graphicsLayer {
-                        val s = if (callState == VoiceCallState.IDLE) 1f else pulse
+                        val s = if (callState == VoiceCallState.IDLE || callState == VoiceCallState.NO_PERMISSION) 1f else pulse
                         scaleX = s
                         scaleY = s
                     }
@@ -148,6 +162,7 @@ fun VoiceConversationScreen(
                     VoiceCallState.THINKING -> "Soch rahi hoon..."
                     VoiceCallState.SPEAKING -> "Bol rahi hoon..."
                     VoiceCallState.IDLE -> "Bolne ke liye mic dabao"
+                    VoiceCallState.NO_PERMISSION -> "Mic permission chahiye — settings me allow karo"
                 },
                 color = VisionTextSecondary,
                 fontSize = 14.sp
@@ -164,9 +179,9 @@ fun VoiceConversationScreen(
             Icon(Icons.Default.Close, contentDescription = "End call", tint = VisionTextPrimary)
         }
 
-        if (callState == VoiceCallState.IDLE) {
+        if (callState == VoiceCallState.IDLE || callState == VoiceCallState.NO_PERMISSION) {
             IconButton(
-                onClick = { startListening() },
+                onClick = { requestListening() },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 56.dp)
