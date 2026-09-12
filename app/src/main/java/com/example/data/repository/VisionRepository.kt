@@ -14,6 +14,9 @@ import com.example.data.model.MemoryFact
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.tasks.await
 
 class VisionRepository(private val dao: VisionDao) {
 
@@ -69,6 +72,63 @@ class VisionRepository(private val dao: VisionDao) {
         }
     }
 
+    private fun pushMessageToCloud(message: ChatMessage) {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        val data = hashMapOf(
+            "sessionId" to message.sessionId,
+            "role" to message.role,
+            "content" to message.content,
+            "timestamp" to message.timestamp,
+            "engineName" to message.engineName
+        )
+        FirebaseFirestore.getInstance()
+            .collection("users").document(uid)
+            .collection("messages")
+            .add(data)
+    }
+
+    private suspend fun saveMessage(message: ChatMessage): Long {
+        val id = dao.insertMessage(message)
+        pushMessageToCloud(message)
+        return id
+    }
+
+    suspend fun restoreFromCloud(): Int {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return -1
+        return try {
+            val snapshot = FirebaseFirestore.getInstance()
+                .collection("users").document(uid)
+                .collection("messages")
+                .orderBy("timestamp")
+                .get()
+                .await()
+
+            if (snapshot.isEmpty) return 0
+
+            val sessionId = dao.insertSession(ChatSession(title = "Restored from Cloud"))
+            var count = 0
+            for (doc in snapshot.documents) {
+                val content = doc.getString("content") ?: continue
+                val role = doc.getString("role") ?: "USER"
+                val timestamp = doc.getLong("timestamp") ?: System.currentTimeMillis()
+                val engineName = doc.getString("engineName") ?: "Vision Core"
+                dao.insertMessage(
+                    ChatMessage(
+                        sessionId = sessionId,
+                        role = role,
+                        content = content,
+                        timestamp = timestamp,
+                        engineName = engineName
+                    )
+                )
+                count++
+            }
+            count
+        } catch (e: Exception) {
+            -1
+        }
+    }
+    
     suspend fun clearAllData() {
         withContext(Dispatchers.IO) {
             dao.clearAllMessages()
@@ -98,7 +158,7 @@ class VisionRepository(private val dao: VisionDao) {
             engineName = engineType.displayName,
             timestamp = System.currentTimeMillis()
         )
-        dao.insertMessage(userMessage)
+        dao.saveMessage(userMessage)
 
         // 2. Fetch conversation history & active memories for context
         val recentHistory = dao.getRecentMessages(sessionId, limit = 8).reversed()
@@ -134,7 +194,7 @@ class VisionRepository(private val dao: VisionDao) {
                 engineName = engineType.displayName,
                 latencyMs = latency
             )
-            dao.insertMessage(assistantMsg)
+            dao.saveMessage(assistantMsg)
             return@withContext Result.success(assistantMsg)
         }
 
@@ -152,7 +212,7 @@ class VisionRepository(private val dao: VisionDao) {
                 engineName = "${engineType.displayName} (Local Fallback)",
                 latencyMs = latency
             )
-            dao.insertMessage(assistantMsg)
+            dao.saveMessage(assistantMsg)
             return@withContext Result.success(assistantMsg)
         }
 
@@ -198,7 +258,7 @@ class VisionRepository(private val dao: VisionDao) {
                 engineName = engineType.displayName,
                 latencyMs = latency
             )
-            dao.insertMessage(assistantMsg)
+            dao.saveMessage(assistantMsg)
 
             // Also check if user asked to remember something and auto-store it
             checkAndAutoRemember(userPrompt, text, dao)
@@ -215,7 +275,7 @@ class VisionRepository(private val dao: VisionDao) {
                 engineName = "${engineType.displayName} (Adaptive)",
                 latencyMs = latency
             )
-            dao.insertMessage(assistantMsg)
+            dao.saveMessage(assistantMsg)
             Result.success(assistantMsg)
         }
     }
