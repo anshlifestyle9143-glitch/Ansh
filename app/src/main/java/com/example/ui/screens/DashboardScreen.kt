@@ -64,6 +64,8 @@ fun DashboardScreen(
     viewModel: VisionViewModel,
     onNavigate: (VisionTab) -> Unit,
     onStartVoiceCall: () -> Unit,
+    onNewChat: () -> Unit,
+    onShowHistory: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val activeEngine by viewModel.activeEngine.collectAsState()
@@ -148,7 +150,9 @@ fun DashboardScreen(
                     onNavigate(VisionTab.CHAT)
                 },
                 onNavigate = onNavigate,
-                onStartVoiceCall = onStartVoiceCall
+                onStartVoiceCall = onStartVoiceCall,
+                onNewChat = onNewChat,
+                onShowHistory = onShowHistory
             )
         }
     }
@@ -159,7 +163,9 @@ fun DashboardScreen(
 private fun RadialHub(
     onCenterClick: () -> Unit,
     onNavigate: (VisionTab) -> Unit,
-    onStartVoiceCall: () -> Unit
+    onStartVoiceCall: () -> Unit,
+    onNewChat: () -> Unit,
+    onShowHistory: () -> Unit
 ) {
 
     val infiniteTransition =
@@ -272,6 +278,7 @@ private fun RadialHub(
             title = "Voice",
             subtitle = "Text",
             onClick = {
+                onNewChat()
                 onNavigate(VisionTab.CHAT)
             }
         )
@@ -285,6 +292,7 @@ private fun RadialHub(
             title = "Voice",
             subtitle = "Voice",
             onClick = {
+                onNewChat()
                 onStartVoiceCall()
             }
         )
@@ -298,7 +306,7 @@ private fun RadialHub(
             title = "History",
             subtitle = null,
             onClick = {
-                onNavigate(VisionTab.CHAT)
+                onShowHistory()
             }
         )
 
