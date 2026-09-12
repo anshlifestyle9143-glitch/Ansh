@@ -80,7 +80,9 @@ fun CreatorScreen(
     val customApiKey by viewModel.customApiKey.collectAsState()
     val context = LocalContext.current
     val scrollState = rememberScrollState()
-
+    val coroutineScope = rememberCoroutineScope()
+    val userEmail by viewModel.userEmail.collectAsState()
+    
     var showClearDialog by remember { mutableStateOf(false) }
     var apiKeyInput by remember(customApiKey) { mutableStateOf(customApiKey) }
 
@@ -184,6 +186,57 @@ fun CreatorScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = VisionCardBg,
+            border = androidx.compose.foundation.BorderStroke(1.dp, VisionCardBorder.copy(alpha = 0.8f)),
+            shadowElevation = 1.dp,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "Cloud Account",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontFamily = FontFamily.Serif,
+                    fontStyle = FontStyle.Italic,
+                    fontWeight = FontWeight.Bold,
+                    color = VisionDeepPlum
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                if (userEmail != null) {
+                    Text("Signed in as $userEmail", color = VisionTextSecondary, style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Button(
+                        onClick = { viewModel.signOut() },
+                        colors = ButtonDefaults.buttonColors(containerColor = VisionCardBorder, contentColor = Color.White),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Sign Out")
+                    }
+                } else {
+                    Text("Sign in to sync memory across devices", color = VisionTextSecondary, style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Button(
+                        onClick = {
+                            coroutineScope.launch {
+                                val webClientId = context.getString(R.string.default_web_client_id)
+                                val result = AuthManager.signInWithGoogle(context, webClientId)
+                                viewModel.onSignInResult(result)
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = VisionDeepPlum, contentColor = Color.White),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Sign in with Google")
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+        
         // API Key Settings Card
         Surface(
             shape = RoundedCornerShape(16.dp),
