@@ -68,6 +68,9 @@ import com.example.ui.theme.VisionTextMuted
 import com.example.ui.theme.VisionTextPrimary
 import com.example.ui.theme.VisionTextSecondary
 import com.example.ui.viewmodel.VisionViewModel
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import com.example.data.auth.AuthManager
 
 @Composable
 fun CreatorScreen(
