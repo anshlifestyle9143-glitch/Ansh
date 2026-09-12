@@ -7,32 +7,27 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.RecordVoiceOver
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -51,7 +46,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.ui.components.VisionTab
-import com.example.ui.theme.VisionCardBorder
 import com.example.ui.theme.VisionDeepPlum
 import com.example.ui.theme.VisionEmerald
 import com.example.ui.theme.VisionLilacLight
@@ -70,115 +64,125 @@ fun DashboardScreen(
 ) {
     val activeEngine by viewModel.activeEngine.collectAsState()
 
-    LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        contentPadding = PaddingValues(
-            top = 8.dp,
-            bottom = 90.dp
-        )
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Color.Black)
     ) {
 
-        item {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp)
+        // System status
+        Column(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
             ) {
-
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(
-                            VisionEmerald.copy(alpha = 0.12f)
-                        )
-                        .border(
-                            BorderStroke(
-                                1.dp,
-                                VisionEmerald.copy(alpha = 0.25f)
-                            ),
-                            RoundedCornerShape(20.dp)
-                        )
-                        .padding(
-                            horizontal = 10.dp,
-                            vertical = 4.dp
-                        )
-                ) {
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-
-                        Box(
-                            modifier = Modifier
-                                .size(6.dp)
-                                .clip(CircleShape)
-                                .background(VisionEmerald)
-                        )
-
-                        Spacer(
-                            modifier = Modifier.width(6.dp)
-                        )
-
-                        Text(
-                            text = "SYSTEM LIVE",
-                            color = VisionEmerald,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            letterSpacing = 1.5.sp
-                        )
-                    }
-                }
-
-                Spacer(
-                    modifier = Modifier.height(6.dp)
+                        .size(6.dp)
+                        .clip(CircleShape)
+                        .background(VisionEmerald)
                 )
 
-                Text(
-                    text = activeEngine.displayName,
-                    color = VisionTextMuted,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium
+                Spacer(modifier = Modifier.width(6.dp))
+
+                androidx.compose.material3.Text(
+                    text = "SYSTEM LIVE",
+                    color = VisionEmerald,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.5.sp
                 )
             }
-        }
 
-        item {
-            RadialHub(
-                onCenterClick = {
-                    onNavigate(VisionTab.CHAT)
-                },
-                onNavigate = onNavigate,
-                onStartVoiceCall = onStartVoiceCall,
-                onNewChat = onNewChat,
-                onShowHistory = onShowHistory
+            androidx.compose.material3.Text(
+                text = activeEngine.displayName,
+                color = VisionTextMuted,
+                fontSize = 9.sp
             )
         }
+
+        // CHAT — TOP
+        HubAction(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 62.dp),
+            icon = Icons.Default.Chat,
+            title = "Chat",
+            subtitle = null,
+            onClick = {
+                onNewChat()
+            }
+        )
+
+        // SETTINGS — LEFT
+        HubAction(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .padding(start = 8.dp),
+            icon = Icons.Default.Settings,
+            title = "Settings",
+            subtitle = null,
+            onClick = {
+                onNavigate(VisionTab.SETTINGS)
+            }
+        )
+
+        // VOICE — RIGHT
+        HubAction(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 8.dp),
+            icon = Icons.Default.RecordVoiceOver,
+            title = "Voice",
+            subtitle = null,
+            onClick = {
+                onStartVoiceCall()
+            }
+        )
+
+        // HISTORY — BOTTOM
+        HubAction(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 22.dp),
+            icon = Icons.Default.History,
+            title = "History",
+            subtitle = null,
+            onClick = {
+                onShowHistory()
+            }
+        )
+
+        // CENTER VISION CORE
+        VisionCore(
+            modifier = Modifier.align(Alignment.Center),
+            onClick = {
+                onNavigate(VisionTab.CHAT)
+            }
+        )
     }
 }
 
-
 @Composable
-private fun RadialHub(
-    onCenterClick: () -> Unit,
-    onNavigate: (VisionTab) -> Unit,
-    onStartVoiceCall: () -> Unit,
-    onNewChat: () -> Unit,
-    onShowHistory: () -> Unit
+private fun VisionCore(
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
 ) {
-
     val infiniteTransition =
         rememberInfiniteTransition(
-            label = "vision_ai_core"
+            label = "vision_core"
         )
 
-    val corePulse by infiniteTransition.animateFloat(
-        initialValue = 0.94f,
-        targetValue = 1.06f,
+    val pulse by infiniteTransition.animateFloat(
+        initialValue = 0.96f,
+        targetValue = 1.04f,
         animationSpec = infiniteRepeatable(
             animation = tween(
-                durationMillis = 1700,
+                durationMillis = 1500,
                 easing = FastOutSlowInEasing
             ),
             repeatMode = RepeatMode.Reverse
@@ -195,137 +199,89 @@ private fun RadialHub(
                 easing = LinearEasing
             )
         ),
-        label = "rotation"
-    )
-
-    val glowAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.20f,
-        targetValue = 0.50f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(
-                durationMillis = 1800,
-                easing = FastOutSlowInEasing
-            ),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "glow"
+        label = "coreRotation"
     )
 
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(430.dp),
+        modifier = modifier
+            .size(300.dp)
+            .graphicsLayer {
+                scaleX = pulse
+                scaleY = pulse
+            },
         contentAlignment = Alignment.Center
     ) {
 
+        // Outer ring
         Box(
             modifier = Modifier
-                .size(285.dp)
+                .size(292.dp)
                 .graphicsLayer {
                     rotationZ = rotation
                 }
                 .border(
-                    BorderStroke(
-                        1.dp,
-                        VisionDeepPlum.copy(alpha = 0.28f)
+                    width = 1.dp,
+                    brush = Brush.sweepGradient(
+                        listOf(
+                            VisionDeepPlum,
+                            Color.Transparent,
+                            VisionDeepPlum,
+                            Color.Transparent,
+                            VisionDeepPlum
+                        )
                     ),
-                    CircleShape
+                    shape = CircleShape
                 )
         )
 
+        // Second ring
         Box(
             modifier = Modifier
-                .size(220.dp)
+                .size(238.dp)
                 .graphicsLayer {
-                    scaleX = corePulse
-                    scaleY = corePulse
+                    rotationZ = -rotation * 0.65f
                 }
                 .border(
-                    BorderStroke(
-                        1.5.dp,
-                        VisionDeepPlum.copy(alpha = 0.40f)
+                    width = 1.5.dp,
+                    brush = Brush.sweepGradient(
+                        listOf(
+                            VisionLilacLight,
+                            Color.Transparent,
+                            VisionDeepPlum,
+                            Color.Transparent
+                        )
                     ),
-                    CircleShape
+                    shape = CircleShape
                 )
         )
 
+        // Glow
         Box(
             modifier = Modifier
-                .size(190.dp)
-                .graphicsLayer {
-                    scaleX = corePulse
-                    scaleY = corePulse
-                }
+                .size(210.dp)
                 .clip(CircleShape)
                 .background(
                     Brush.radialGradient(
                         colors = listOf(
-                            VisionDeepPlum.copy(
-                                alpha = glowAlpha
-                            ),
+                            VisionLilacLight.copy(alpha = 0.55f),
+                            VisionDeepPlum.copy(alpha = 0.28f),
                             Color.Transparent
                         )
                     )
                 )
         )
 
-        // LEFT — VOICE TO TEXT
-        HubAction(
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .padding(start = 8.dp),
-            icon = Icons.Default.Mic,
-            title = "Voice",
-            subtitle = "Text",
-            onClick = {
-                onNewChat()
-                onNavigate(VisionTab.CHAT)
-            }
-        )
-
-        // RIGHT — VOICE TO VOICE
-        HubAction(
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .padding(end = 8.dp),
-            icon = Icons.Default.RecordVoiceOver,
-            title = "Voice",
-            subtitle = "Voice",
-            onClick = {
-                onNewChat()
-                onStartVoiceCall()
-            }
-        )
-
-        // BOTTOM — HISTORY
-        HubAction(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 12.dp),
-            icon = Icons.Default.History,
-            title = "History",
-            subtitle = null,
-            onClick = {
-                onShowHistory()
-            }
-        )
-
-        // MAIN VISION AI CORE
+        // Core
         Surface(
             modifier = Modifier
                 .size(148.dp)
-                .graphicsLayer {
-                    scaleX = corePulse
-                    scaleY = corePulse
-                }
                 .clickable {
-                    onCenterClick()
+                    onClick()
                 },
             shape = CircleShape,
             color = Color.Transparent,
-            shadowElevation = 22.dp
+            shadowElevation = 24.dp
         ) {
-
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -334,32 +290,31 @@ private fun RadialHub(
                         Brush.radialGradient(
                             colors = listOf(
                                 VisionLilacLight,
-                                VisionDeepPlum.copy(
-                                    alpha = 0.75f
-                                ),
-                                VisionDeepPlum.copy(
-                                    alpha = 0.35f
-                                )
+                                VisionDeepPlum.copy(alpha = 0.90f),
+                                Color.Black
                             )
                         )
                     )
                     .border(
-                        BorderStroke(
-                            2.dp,
-                            VisionDeepPlum.copy(
-                                alpha = 0.65f
+                        width = 2.dp,
+                        brush = Brush.sweepGradient(
+                            listOf(
+                                VisionLilacLight,
+                                VisionDeepPlum,
+                                VisionLilacLight,
+                                VisionDeepPlum
                             )
                         ),
-                        CircleShape
+                        shape = CircleShape
                     ),
                 contentAlignment = Alignment.Center
             ) {
 
-                Image(
+                androidx.compose.foundation.Image(
                     painter = painterResource(
                         id = R.drawable.ic_vision_logo
                     ),
-                    contentDescription = "Vision AI",
+                    contentDescription = "Vision AI Core",
                     modifier = Modifier.size(88.dp),
                     contentScale = ContentScale.Fit
                 )
@@ -367,7 +322,6 @@ private fun RadialHub(
         }
     }
 }
-
 
 @Composable
 private fun HubAction(
@@ -377,9 +331,9 @@ private fun HubAction(
     subtitle: String?,
     onClick: () -> Unit
 ) {
-
     Column(
         modifier = modifier
+            .clip(RoundedCornerShape(18.dp))
             .clickable {
                 onClick()
             }
@@ -387,68 +341,55 @@ private fun HubAction(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
 
-        Surface(
-            modifier = Modifier.size(58.dp),
-            shape = CircleShape,
-            color = Color.Transparent,
-            shadowElevation = 8.dp
-        ) {
-
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(CircleShape)
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(
-                                VisionLilacLight.copy(
-                                    alpha = 0.80f
-                                ),
-                                VisionDeepPlum.copy(
-                                    alpha = 0.35f
-                                )
-                            )
+        Box(
+            modifier = Modifier
+                .size(58.dp)
+                .clip(CircleShape)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            VisionLilacLight.copy(alpha = 0.95f),
+                            VisionDeepPlum.copy(alpha = 0.65f),
+                            Color.Black
                         )
                     )
-                    .border(
-                        BorderStroke(
-                            1.dp,
-                            VisionDeepPlum.copy(
-                                alpha = 0.45f
-                            )
-                        ),
-                        CircleShape
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-
-                Icon(
-                    imageVector = icon,
-                    contentDescription = title,
-                    tint = Color.White,
-                    modifier = Modifier.size(27.dp)
                 )
-            }
+                .border(
+                    width = 1.5.dp,
+                    brush = Brush.sweepGradient(
+                        listOf(
+                            VisionLilacLight,
+                            VisionDeepPlum,
+                            Color.Transparent,
+                            VisionLilacLight
+                        )
+                    ),
+                    shape = CircleShape
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = title,
+                tint = Color.White,
+                modifier = Modifier.size(27.dp)
+            )
         }
 
-        Spacer(
-            modifier = Modifier.height(5.dp)
-        )
+        Spacer(modifier = Modifier.size(5.dp))
 
         Text(
             text = title,
-            color = VisionTextSecondary,
+            color = Color.White,
             fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold
+            fontWeight = FontWeight.Bold
         )
 
         if (subtitle != null) {
-
             Text(
                 text = subtitle,
-                color = VisionTextMuted,
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Medium
+                color = VisionTextSecondary,
+                fontSize = 9.sp
             )
         }
     }
