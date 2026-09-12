@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -49,6 +51,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -74,39 +77,63 @@ fun ChatScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+
     val messages by viewModel.messages.collectAsState()
     val isGenerating by viewModel.isGenerating.collectAsState()
     val userInput by viewModel.userInput.collectAsState()
     val activeEngine by viewModel.activeEngine.collectAsState()
+
     val isSpeaking by viewModel.ttsManager.isSpeaking.collectAsState()
     val currentSpeakingId by viewModel.ttsManager.currentSpeakingId.collectAsState()
 
     val listState = rememberLazyListState()
-    val speechRecognizer = remember { LiveSpeechRecognizer(context) }
+
+    val speechRecognizer = remember {
+        LiveSpeechRecognizer(context)
+    }
 
     DisposableEffect(Unit) {
-        onDispose { speechRecognizer.destroy() }
+        onDispose {
+            speechRecognizer.destroy()
+        }
     }
 
     fun startListening() {
         speechRecognizer.start(
-            onPartial = { text -> viewModel.onUserInputChange(text) },
-            onFinal = { text -> viewModel.onUserInputChange(text) },
+            onPartial = { text ->
+                viewModel.onUserInputChange(text)
+            },
+            onFinal = { text ->
+                viewModel.onUserInputChange(text)
+            },
             onListeningChange = {},
             onError = {}
         )
     }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { granted -> if (granted) startListening() }
+    val permissionLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.RequestPermission()
+        ) { granted ->
+            if (granted) {
+                startListening()
+            }
+        }
 
     fun requestListening() {
-        val hasPermission = ContextCompat.checkSelfPermission(
-            context, Manifest.permission.RECORD_AUDIO
-        ) == PackageManager.PERMISSION_GRANTED
+        val hasPermission =
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED
 
-        if (hasPermission) startListening() else permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        if (hasPermission) {
+            startListening()
+        } else {
+            permissionLauncher.launch(
+                Manifest.permission.RECORD_AUDIO
+            )
+        }
     }
 
     LaunchedEffect(autoStartVoice) {
@@ -118,7 +145,9 @@ fun ChatScreen(
 
     LaunchedEffect(messages.size, isGenerating) {
         if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.size - 1)
+            listState.animateScrollToItem(
+                messages.size - 1
+            )
         }
     }
 
@@ -136,25 +165,39 @@ fun ChatScreen(
             if (messages.isEmpty()) {
                 EmptyChatGuide(
                     activeEngine = activeEngine,
-                    onPromptClick = { prompt -> viewModel.sendMessage(prompt) }
+                    onPromptClick = { prompt ->
+                        viewModel.sendMessage(prompt)
+                    }
                 )
             } else {
                 LazyColumn(
                     state = listState,
-                    contentPadding = PaddingValues(vertical = 12.dp),
+                    contentPadding = PaddingValues(
+                        vertical = 12.dp
+                    ),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    items(messages, key = { it.id }) { message ->
+                    items(
+                        items = messages,
+                        key = { message -> message.id }
+                    ) { message ->
+
                         ChatMessageItem(
                             message = message,
-                            isSpeaking = isSpeaking && currentSpeakingId == message.id,
-                            onSpeakClick = { viewModel.toggleSpeak(message) }
+                            isSpeaking =
+                                isSpeaking &&
+                                currentSpeakingId == message.id,
+                            onSpeakClick = {
+                                viewModel.toggleSpeak(message)
+                            }
                         )
                     }
 
                     if (isGenerating) {
                         item {
-                            ThinkingIndicator(engine = activeEngine)
+                            ThinkingIndicator(
+                                engine = activeEngine
+                            )
                         }
                     }
                 }
@@ -163,10 +206,16 @@ fun ChatScreen(
 
         ChatInputBar(
             value = userInput,
-            onValueChange = { viewModel.onUserInputChange(it) },
-            onSend = { viewModel.sendMessage() },
+            onValueChange = {
+                viewModel.onUserInputChange(it)
+            },
+            onSend = {
+                viewModel.sendMessage()
+            },
             isGenerating = isGenerating,
-            onVoiceClick = { requestListening() }
+            onVoiceClick = {
+                requestListening()
+            }
         )
     }
 }
@@ -198,7 +247,9 @@ fun EmptyChatGuide(
             )
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(
+            modifier = Modifier.height(16.dp)
+        )
 
         Text(
             text = "Vision AI Assistant",
@@ -213,18 +264,26 @@ fun EmptyChatGuide(
             text = "Engineered by Ansh Yadav with modular neural intelligence and persistent local memory vault.",
             style = MaterialTheme.typography.bodyMedium,
             color = VisionTextSecondary,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            modifier = Modifier.padding(
+                horizontal = 16.dp,
+                vertical = 6.dp
+            ),
+            textAlign = TextAlign.Center
         )
     }
 }
 
 @Composable
-fun ThinkingIndicator(engine: AiEngineType) {
+fun ThinkingIndicator(
+    engine: AiEngineType
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(
+                horizontal = 16.dp,
+                vertical = 8.dp
+            ),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
@@ -241,18 +300,26 @@ fun ThinkingIndicator(engine: AiEngineType) {
             )
         }
 
-        Spacer(modifier = Modifier.width(10.dp))
+        Spacer(
+            modifier = Modifier.width(10.dp)
+        )
 
         Surface(
             shape = RoundedCornerShape(14.dp),
             color = VisionCardBg,
-            border = androidx.compose.foundation.BorderStroke(1.dp, VisionCardBorder.copy(alpha = 0.7f))
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                VisionCardBorder.copy(alpha = 0.7f)
+            )
         ) {
             Text(
                 text = "${engine.displayName} is synthesizing neural response...",
                 style = MaterialTheme.typography.bodySmall,
                 color = VisionTextSecondary,
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                modifier = Modifier.padding(
+                    horizontal = 14.dp,
+                    vertical = 10.dp
+                )
             )
         }
     }
@@ -268,17 +335,28 @@ fun ChatInputBar(
 ) {
     Surface(
         color = VisionCardBg,
-        border = androidx.compose.foundation.BorderStroke(1.dp, VisionCardBorder),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            VisionCardBorder
+        ),
         shadowElevation = 2.dp,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 8.dp)
-            .clip(RoundedCornerShape(26.dp))
+            .padding(
+                horizontal = 12.dp,
+                vertical = 8.dp
+            )
+            .clip(
+                RoundedCornerShape(26.dp)
+            )
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 4.dp),
+                .padding(
+                    horizontal = 8.dp,
+                    vertical = 4.dp
+                ),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(
@@ -318,21 +396,37 @@ fun ChatInputBar(
                     .testTag("chat_text_input")
             )
 
-            val canSend = value.isNotBlank() && !isGenerating
+            val canSend =
+                value.isNotBlank() && !isGenerating
 
             Box(
                 modifier = Modifier
                     .size(38.dp)
                     .clip(CircleShape)
-                    .background(if (canSend) VisionDeepPlum else VisionLilacPill)
-                    .clickable(enabled = canSend) { onSend() }
+                    .background(
+                        if (canSend) {
+                            VisionDeepPlum
+                        } else {
+                            VisionLilacPill
+                        }
+                    )
+                    .clickable(
+                        enabled = canSend
+                    ) {
+                        onSend()
+                    }
                     .testTag("send_button"),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.ArrowUpward,
                     contentDescription = "Send prompt",
-                    tint = if (canSend) Color.White else VisionTextMuted,
+                    tint =
+                        if (canSend) {
+                            Color.White
+                        } else {
+                            VisionTextMuted
+                        },
                     modifier = Modifier.size(20.dp)
                 )
             }
