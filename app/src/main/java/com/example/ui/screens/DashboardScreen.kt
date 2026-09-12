@@ -8,6 +8,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -33,24 +34,26 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.R
 import com.example.ui.components.VisionTab
 import com.example.ui.viewmodel.VisionViewModel
 import kotlin.math.cos
 import kotlin.math.sin
 
-private val NeonBlue = Color(0xFF00D9FF)
-private val ElectricBlue = Color(0xFF168BFF)
-private val NeonViolet = Color(0xFF7137FF)
-private val NeonPurple = Color(0xFFB42CFF)
+private val NeonBlue = Color(0xFF00DFFF)
+private val ElectricBlue = Color(0xFF167BFF)
+private val NeonViolet = Color(0xFF633CFF)
+private val NeonPurple = Color(0xFFB72CFF)
 private val DeepBlack = Color(0xFF010207)
 
 @Composable
@@ -70,16 +73,13 @@ fun DashboardScreen(
             .background(DeepBlack)
     ) {
 
-        /*
-         * SYSTEM STATUS
-         */
+        // SYSTEM LIVE
         Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .padding(top = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-
             Text(
                 text = "●  SYSTEM LIVE",
                 color = NeonBlue,
@@ -99,88 +99,85 @@ fun DashboardScreen(
         }
 
         /*
-         * CHAT
+         * MAIN HUD
          *
-         * Orbit ke paas — screen ke bilkul top par nahi.
+         * Screen ke center se thoda upar,
+         * taaki History neeche cut na ho.
          */
-        OrbitAction(
+        Box(
             modifier = Modifier
                 .align(Alignment.Center)
-                .padding(bottom = 238.dp),
-            icon = Icons.Default.Chat,
-            title = "CHAT",
-            onClick = {
-                onNewChat()
-            }
-        )
+                .padding(bottom = 35.dp)
+                .size(400.dp),
+            contentAlignment = Alignment.Center
+        ) {
 
-        /*
-         * SETTINGS
-         *
-         * Left orbit.
-         */
-        OrbitAction(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .padding(end = 232.dp),
-            icon = Icons.Default.Settings,
-            title = "SETTINGS",
-            onClick = {
-                onNavigate(VisionTab.SETTINGS)
-            }
-        )
+            VisionHudRings()
 
-        /*
-         * VOICE
-         *
-         * Right orbit.
-         */
-        OrbitAction(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .padding(start = 232.dp),
-            icon = Icons.Default.RecordVoiceOver,
-            title = "VOICE",
-            onClick = {
-                onStartVoiceCall()
-            }
-        )
+            // CHAT — top of orbit
+            OrbitAction(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 0.dp),
+                icon = Icons.Default.Chat,
+                title = "CHAT",
+                onClick = {
+                    onNewChat()
+                }
+            )
 
-        /*
-         * HISTORY
-         *
-         * Orbit ke neeche — bahut bottom par nahi.
-         */
-        OrbitAction(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .padding(top = 238.dp),
-            icon = Icons.Default.History,
-            title = "HISTORY",
-            onClick = {
-                onShowHistory()
-            }
-        )
+            // SETTINGS — left
+            OrbitAction(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(start = 0.dp),
+                icon = Icons.Default.Settings,
+                title = "SETTINGS",
+                onClick = {
+                    onNavigate(VisionTab.SETTINGS)
+                }
+            )
 
-        /*
-         * MAIN VISION CORE
-         */
-        VisionEnergyCore(
-            modifier = Modifier.align(Alignment.Center),
-            onClick = {
-                onNavigate(VisionTab.CHAT)
-            }
-        )
+            // VOICE — right
+            OrbitAction(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 0.dp),
+                icon = Icons.Default.RecordVoiceOver,
+                title = "VOICE",
+                onClick = {
+                    onStartVoiceCall()
+                }
+            )
 
-        /*
-         * FOOTER
-         */
+            // HISTORY — bottom
+            OrbitAction(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 0.dp),
+                icon = Icons.Default.History,
+                title = "HISTORY",
+                onClick = {
+                    onShowHistory()
+                }
+            )
+
+            // VISION CORE
+            VisionCore(
+                modifier = Modifier.align(Alignment.Center),
+                onClick = {
+                    onNavigate(VisionTab.CHAT)
+                }
+            )
+        }
+
+        // FOOTER
         Text(
             text = "THINK  •  ASK  •  EVOLVE",
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 7.dp),
-            color = Color(0xFF4D5870),
+                .padding(bottom = 8.dp),
+            color = Color(0xFF53607A),
             fontSize = 7.sp,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 2.sp
@@ -189,25 +186,10 @@ fun DashboardScreen(
 }
 
 @Composable
-private fun VisionEnergyCore(
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    val transition = rememberInfiniteTransition(
-        label = "vision_energy"
-    )
+private fun VisionHudRings() {
 
-    val pulse by transition.animateFloat(
-        initialValue = 0.96f,
-        targetValue = 1.045f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(
-                1300,
-                easing = FastOutSlowInEasing
-            ),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulse"
+    val transition = rememberInfiniteTransition(
+        label = "hud_rotation"
     )
 
     val rotation by transition.animateFloat(
@@ -215,7 +197,7 @@ private fun VisionEnergyCore(
         targetValue = 360f,
         animationSpec = infiniteRepeatable(
             animation = tween(
-                9000,
+                durationMillis = 9000,
                 easing = LinearEasing
             )
         ),
@@ -227,16 +209,185 @@ private fun VisionEnergyCore(
         targetValue = 0f,
         animationSpec = infiniteRepeatable(
             animation = tween(
-                7000,
+                durationMillis = 7000,
                 easing = LinearEasing
             )
         ),
-        label = "reverseRotation"
+        label = "reverse"
+    )
+
+    Box(
+        modifier = Modifier.size(400.dp),
+        contentAlignment = Alignment.Center
+    ) {
+
+        // Wide atmospheric glow
+        Box(
+            modifier = Modifier
+                .size(380.dp)
+                .clip(CircleShape)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            NeonBlue.copy(alpha = 0.10f),
+                            NeonViolet.copy(alpha = 0.13f),
+                            NeonPurple.copy(alpha = 0.06f),
+                            Color.Transparent
+                        )
+                    )
+                )
+        )
+
+        // Outer ring
+        Canvas(
+            modifier = Modifier
+                .size(382.dp)
+                .graphicsLayer {
+                    rotationZ = rotation
+                }
+        ) {
+            drawArc(
+                brush = Brush.sweepGradient(
+                    listOf(
+                        NeonBlue,
+                        NeonViolet,
+                        Color.Transparent,
+                        NeonPurple,
+                        NeonBlue
+                    )
+                ),
+                startAngle = 5f,
+                sweepAngle = 305f,
+                useCenter = false,
+                style = Stroke(
+                    width = 1.7.dp.toPx(),
+                    cap = StrokeCap.Round
+                )
+            )
+
+            drawArc(
+                brush = Brush.sweepGradient(
+                    listOf(
+                        Color.Transparent,
+                        NeonBlue,
+                        Color.Transparent
+                    )
+                ),
+                startAngle = 220f,
+                sweepAngle = 70f,
+                useCenter = false,
+                style = Stroke(
+                    width = 2.dp.toPx(),
+                    cap = StrokeCap.Round
+                )
+            )
+        }
+
+        // Middle ring
+        Canvas(
+            modifier = Modifier
+                .size(330.dp)
+                .graphicsLayer {
+                    rotationZ = reverseRotation
+                }
+        ) {
+            drawArc(
+                brush = Brush.sweepGradient(
+                    listOf(
+                        NeonViolet,
+                        NeonBlue,
+                        Color.Transparent,
+                        NeonPurple
+                    )
+                ),
+                startAngle = -15f,
+                sweepAngle = 325f,
+                useCenter = false,
+                style = Stroke(
+                    width = 2.dp.toPx(),
+                    cap = StrokeCap.Round
+                )
+            )
+        }
+
+        // Inner ring
+        Canvas(
+            modifier = Modifier
+                .size(270.dp)
+                .graphicsLayer {
+                    rotationZ = rotation * 1.35f
+                }
+        ) {
+            drawArc(
+                brush = Brush.sweepGradient(
+                    listOf(
+                        NeonBlue,
+                        Color.Transparent,
+                        NeonPurple,
+                        NeonViolet,
+                        NeonBlue
+                    )
+                ),
+                startAngle = 20f,
+                sweepAngle = 290f,
+                useCenter = false,
+                style = Stroke(
+                    width = 2.4.dp.toPx(),
+                    cap = StrokeCap.Round
+                )
+            )
+        }
+
+        // Inner energy glow
+        Box(
+            modifier = Modifier
+                .size(245.dp)
+                .clip(CircleShape)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            NeonBlue.copy(alpha = 0.25f),
+                            NeonViolet.copy(alpha = 0.25f),
+                            NeonPurple.copy(alpha = 0.12f),
+                            Color.Transparent
+                        )
+                    )
+                )
+        )
+
+        EnergyDots(
+            modifier = Modifier.size(245.dp),
+            rotation = rotation
+        )
+    }
+}
+
+@Composable
+private fun VisionCore(
+    modifier: Modifier,
+    onClick: () -> Unit
+) {
+
+    val transition = rememberInfiniteTransition(
+        label = "core_pulse"
+    )
+
+    val pulse by transition.animateFloat(
+        initialValue = 0.96f,
+        targetValue = 1.05f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(
+                durationMillis = 1300,
+                easing = FastOutSlowInEasing
+            ),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse"
     )
 
     Box(
         modifier = modifier
-            .size(235.dp)
+            .size(185.dp)
             .graphicsLayer {
                 scaleX = pulse
                 scaleY = pulse
@@ -247,193 +398,35 @@ private fun VisionEnergyCore(
         contentAlignment = Alignment.Center
     ) {
 
-        /*
-         * LARGE BLUE/VIOLET ATMOSPHERIC GLOW
-         */
+        // Core outer glow
         Box(
             modifier = Modifier
-                .size(235.dp)
+                .size(185.dp)
                 .clip(CircleShape)
                 .background(
                     Brush.radialGradient(
                         colors = listOf(
-                            NeonBlue.copy(alpha = 0.30f),
-                            NeonViolet.copy(alpha = 0.20f),
-                            NeonPurple.copy(alpha = 0.08f),
+                            NeonBlue.copy(alpha = 0.40f),
+                            ElectricBlue.copy(alpha = 0.25f),
+                            NeonViolet.copy(alpha = 0.25f),
                             Color.Transparent
                         )
                     )
                 )
         )
 
-        /*
-         * OUTER HUD RING
-         */
-        Canvas(
-            modifier = Modifier
-                .size(225.dp)
-                .graphicsLayer {
-                    rotationZ = rotation
-                }
-        ) {
-            val stroke = Stroke(
-                width = 1.6.dp.toPx(),
-                cap = StrokeCap.Round
-            )
-
-            drawArc(
-                brush = Brush.sweepGradient(
-                    listOf(
-                        NeonBlue,
-                        Color.Transparent,
-                        NeonViolet,
-                        Color.Transparent,
-                        NeonBlue
-                    )
-                ),
-                startAngle = 12f,
-                sweepAngle = 285f,
-                useCenter = false,
-                style = stroke
-            )
-
-            drawArc(
-                brush = Brush.sweepGradient(
-                    listOf(
-                        Color.Transparent,
-                        NeonPurple,
-                        Color.Transparent,
-                        NeonBlue
-                    )
-                ),
-                startAngle = 205f,
-                sweepAngle = 100f,
-                useCenter = false,
-                style = stroke
-            )
-        }
-
-        /*
-         * SECOND HUD RING
-         */
-        Canvas(
-            modifier = Modifier
-                .size(195.dp)
-                .graphicsLayer {
-                    rotationZ = reverseRotation
-                }
-        ) {
-            val stroke = Stroke(
-                width = 1.2.dp.toPx(),
-                cap = StrokeCap.Round
-            )
-
-            drawArc(
-                brush = Brush.sweepGradient(
-                    listOf(
-                        NeonPurple,
-                        Color.Transparent,
-                        NeonBlue,
-                        Color.Transparent
-                    )
-                ),
-                startAngle = -20f,
-                sweepAngle = 245f,
-                useCenter = false,
-                style = stroke
-            )
-
-            drawArc(
-                brush = Brush.sweepGradient(
-                    listOf(
-                        Color.Transparent,
-                        NeonBlue,
-                        Color.Transparent,
-                        NeonPurple
-                    )
-                ),
-                startAngle = 190f,
-                sweepAngle = 105f,
-                useCenter = false,
-                style = stroke
-            )
-        }
-
-        /*
-         * INNER ENERGY FIELD
-         */
+        // Core sphere
         Box(
             modifier = Modifier
-                .size(177.dp)
+                .size(160.dp)
                 .clip(CircleShape)
                 .background(
                     Brush.radialGradient(
                         colors = listOf(
-                            NeonBlue.copy(alpha = 0.35f),
-                            ElectricBlue.copy(alpha = 0.20f),
-                            NeonViolet.copy(alpha = 0.28f),
-                            Color.Transparent
-                        )
-                    )
-                )
-        )
-
-        /*
-         * CORE ORBIT
-         */
-        Canvas(
-            modifier = Modifier
-                .size(170.dp)
-                .graphicsLayer {
-                    rotationZ = rotation * 1.35f
-                }
-        ) {
-
-            val stroke = Stroke(
-                width = 2.dp.toPx(),
-                cap = StrokeCap.Round
-            )
-
-            drawArc(
-                brush = Brush.sweepGradient(
-                    listOf(
-                        NeonBlue,
-                        NeonViolet,
-                        Color.Transparent,
-                        NeonPurple,
-                        NeonBlue
-                    )
-                ),
-                startAngle = 0f,
-                sweepAngle = 315f,
-                useCenter = false,
-                style = stroke
-            )
-        }
-
-        /*
-         * ENERGY PARTICLES
-         */
-        EnergyParticles(
-            modifier = Modifier.size(165.dp),
-            rotation = rotation
-        )
-
-        /*
-         * CENTRAL CORE
-         */
-        Box(
-            modifier = Modifier
-                .size(122.dp)
-                .clip(CircleShape)
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(
-                            Color(0xFFBDEFFF),
-                            Color(0xFF37BFFF),
-                            Color(0xFF4964FF),
-                            Color(0xFF6D28D9),
-                            Color(0xFF18072D)
+                            Color(0xFF0C6FFF),
+                            Color(0xFF173BCE),
+                            Color(0xFF3920A4),
+                            Color(0xFF13072F)
                         )
                     )
                 )
@@ -453,27 +446,26 @@ private fun VisionEnergyCore(
         ) {
 
             /*
-             * Core logo
-             *
-             * Existing Vision logo use hoga.
+             * Existing Vision logo ko circular crop
+             * kiya gaya hai taaki square box kam dikhe.
              */
-            androidx.compose.foundation.Image(
-                painter = androidx.compose.ui.res.painterResource(
-                    id = com.example.R.drawable.ic_vision_logo
+            Image(
+                painter = painterResource(
+                    id = R.drawable.ic_vision_logo
                 ),
                 contentDescription = "Vision Core",
-                modifier = Modifier.size(76.dp)
+                modifier = Modifier
+                    .size(116.dp)
+                    .clip(CircleShape),
+                contentScale = ContentScale.Crop
             )
         }
 
-        /*
-         * CORE LABEL
-         */
         Text(
             text = "VISION CORE",
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 2.dp),
+                .padding(bottom = 7.dp),
             color = Color.White,
             fontSize = 7.sp,
             fontWeight = FontWeight.ExtraBold,
@@ -483,48 +475,48 @@ private fun VisionEnergyCore(
 }
 
 @Composable
-private fun EnergyParticles(
-    modifier: Modifier = Modifier,
+private fun EnergyDots(
+    modifier: Modifier,
     rotation: Float
 ) {
-    val particles = remember {
+    val points = remember {
         listOf(
-            Triple(0.12f, 0.18f, 2.2f),
-            Triple(0.82f, 0.20f, 1.7f),
-            Triple(0.90f, 0.62f, 2.0f),
-            Triple(0.18f, 0.82f, 1.5f),
-            Triple(0.38f, 0.08f, 1.4f),
-            Triple(0.70f, 0.88f, 1.8f),
-            Triple(0.08f, 0.52f, 1.5f),
-            Triple(0.94f, 0.40f, 1.3f)
+            0.10f to 0.31f,
+            0.18f to 0.72f,
+            0.35f to 0.12f,
+            0.67f to 0.16f,
+            0.84f to 0.39f,
+            0.79f to 0.75f,
+            0.51f to 0.91f,
+            0.28f to 0.87f,
+            0.92f to 0.58f
         )
     }
 
     Canvas(
         modifier = modifier
     ) {
-        particles.forEachIndexed { index, particle ->
+        val cx = size.width / 2f
+        val cy = size.height / 2f
 
-            val x = size.width * particle.first
-            val y = size.height * particle.second
+        points.forEachIndexed { index, point ->
 
-            val angle =
-                Math.toRadians(
-                    (rotation * (if (index % 2 == 0) 1 else -1)).toDouble()
-                )
+            val px = size.width * point.first
+            val py = size.height * point.second
 
-            val centerX = size.width / 2f
-            val centerY = size.height / 2f
+            val angle = Math.toRadians(
+                (rotation * if (index % 2 == 0) 1 else -1).toDouble()
+            )
 
-            val rotatedX =
-                centerX +
-                        (x - centerX) * cos(angle).toFloat() -
-                        (y - centerY) * sin(angle).toFloat()
+            val x =
+                cx +
+                        (px - cx) * cos(angle).toFloat() -
+                        (py - cy) * sin(angle).toFloat()
 
-            val rotatedY =
-                centerY +
-                        (x - centerX) * sin(angle).toFloat() +
-                        (y - centerY) * cos(angle).toFloat()
+            val y =
+                cy +
+                        (px - cx) * sin(angle).toFloat() +
+                        (py - cy) * cos(angle).toFloat()
 
             drawCircle(
                 color = if (index % 2 == 0) {
@@ -532,11 +524,12 @@ private fun EnergyParticles(
                 } else {
                     NeonPurple
                 },
-                radius = particle.third.dp.toPx(),
-                center = Offset(
-                    rotatedX,
-                    rotatedY
-                )
+                radius = if (index % 3 == 0) {
+                    2.2.dp.toPx()
+                } else {
+                    1.5.dp.toPx()
+                },
+                center = Offset(x, y)
             )
         }
     }
@@ -549,9 +542,9 @@ private fun OrbitAction(
     title: String,
     onClick: () -> Unit
 ) {
+
     Column(
         modifier = modifier
-            .clip(CircleShape)
             .clickable {
                 onClick()
             },
@@ -560,25 +553,25 @@ private fun OrbitAction(
 
         Box(
             modifier = Modifier
-                .size(52.dp)
+                .size(68.dp)
                 .clip(CircleShape)
                 .background(
                     Brush.radialGradient(
                         colors = listOf(
-                            Color(0xFF253B8F),
-                            Color(0xFF32145E),
-                            Color(0xFF07040E)
+                            Color(0xFF2857C7),
+                            Color(0xFF24206F),
+                            Color(0xFF09051A)
                         )
                     )
                 )
                 .border(
-                    width = 1.4.dp,
+                    width = 1.6.dp,
                     brush = Brush.sweepGradient(
                         listOf(
                             NeonBlue,
                             NeonViolet,
-                            Color.Transparent,
                             NeonPurple,
+                            Color.Transparent,
                             NeonBlue
                         )
                     ),
@@ -591,16 +584,16 @@ private fun OrbitAction(
                 imageVector = icon,
                 contentDescription = title,
                 tint = Color.White,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(30.dp)
             )
         }
 
-        Spacer(modifier = Modifier.size(4.dp))
+        Spacer(modifier = Modifier.size(6.dp))
 
         Text(
             text = title,
             color = Color.White,
-            fontSize = 8.sp,
+            fontSize = 10.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 1.2.sp
         )
