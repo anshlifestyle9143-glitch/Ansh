@@ -70,85 +70,92 @@ fun VisionApp(viewModel: VisionViewModel) {
         }
     }
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        containerColor = VisionBackground,
-        topBar = {
-            VisionHeader(
-                activeEngine = activeEngine,
-                onEngineClick = { showEngineSheet = true },
-                onHistoryClick = { showHistorySheet = true },
-                onNewChatClick = {
-                    viewModel.createNewSession()
-                    currentTab = VisionTab.CHAT
-                }
-            )
-        },
-        bottomBar = {
-            VisionBottomNav(
-                currentTab = currentTab,
-                onTabSelected = { currentTab = it }
-            )
-        }
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .background(VisionBackground)
-        ) {
-            when (currentTab) {
-                VisionTab.HOME -> DashboardScreen(
-                    viewModel = viewModel,
-                    onNavigate = { currentTab = it },
-                    onStartVoiceCall = { showVoiceCall = true }
+    if (showVoiceCall) {
+        VoiceConversationScreen(
+            viewModel = viewModel,
+            onExit = { showVoiceCall = false }
+        )
+    } else {
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = VisionBackground,
+            topBar = {
+                VisionHeader(
+                    activeEngine = activeEngine,
+                    onEngineClick = { showEngineSheet = true },
+                    onHistoryClick = { showHistorySheet = true },
+                    onNewChatClick = {
+                        viewModel.createNewSession()
+                        currentTab = VisionTab.CHAT
+                    }
                 )
-
-                VisionTab.CHAT -> ChatScreen(
-                    viewModel = viewModel
-                )
-
-                VisionTab.MEMORY -> MemoryVaultScreen(
-                    viewModel = viewModel
-                )
-
-                VisionTab.ENGINES -> EnginesScreen(
-                    viewModel = viewModel
-                )
-
-                VisionTab.CREATOR -> CreatorScreen(
-                    viewModel = viewModel
+            },
+            bottomBar = {
+                VisionBottomNav(
+                    currentTab = currentTab,
+                    onTabSelected = { currentTab = it }
                 )
             }
+        ) { innerPadding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .background(VisionBackground)
+            ) {
+                when (currentTab) {
+                    VisionTab.HOME -> DashboardScreen(
+                        viewModel = viewModel,
+                        onNavigate = { currentTab = it },
+                        onStartVoiceCall = { showVoiceCall = true }
+                    )
+
+                    VisionTab.CHAT -> ChatScreen(
+                        viewModel = viewModel
+                    )
+
+                    VisionTab.MEMORY -> MemoryVaultScreen(
+                        viewModel = viewModel
+                    )
+
+                    VisionTab.ENGINES -> EnginesScreen(
+                        viewModel = viewModel
+                    )
+
+                    VisionTab.CREATOR -> CreatorScreen(
+                        viewModel = viewModel
+                    )
+                }
+            }
         }
-    }
 
-    if (showEngineSheet) {
-        EngineSelectorSheet(
-            selectedEngine = activeEngine,
-            onEngineSelected = { engine ->
-                viewModel.setEngine(engine)
-            },
-            onDismiss = { showEngineSheet = false }
-        )
-    }
+        if (showEngineSheet) {
+            EngineSelectorSheet(
+                selectedEngine = activeEngine,
+                onEngineSelected = { engine ->
+                    viewModel.setEngine(engine)
+                },
+                onDismiss = { showEngineSheet = false }
+            )
+        }
 
-    if (showHistorySheet) {
-        SessionDrawerSheet(
-            sessions = sessions,
-            currentSessionId = currentSessionId,
-            onSessionSelected = { sessionId ->
-                viewModel.selectSession(sessionId)
-                currentTab = VisionTab.CHAT
-            },
-            onDeleteSession = { sessionId ->
-                viewModel.deleteSession(sessionId)
-            },
-            onNewSession = {
-                viewModel.createNewSession()
-                currentTab = VisionTab.CHAT
-            },
-            onDismiss = { showHistorySheet = false }
-        )
+        if (showHistorySheet) {
+            SessionDrawerSheet(
+                sessions = sessions,
+                currentSessionId = currentSessionId,
+                onSessionSelected = { sessionId ->
+                    viewModel.selectSession(sessionId)
+                    currentTab = VisionTab.CHAT
+                },
+                onDeleteSession = { sessionId ->
+                    viewModel.deleteSession(sessionId)
+                },
+                onNewSession = {
+                    viewModel.createNewSession()
+                    currentTab = VisionTab.CHAT
+                },
+                onDismiss = { showHistorySheet = false }
+            )
+        }
     }
 }
