@@ -206,6 +206,17 @@ class VisionViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun restoreFromCloud() {
+        viewModelScope.launch {
+            val count = repository.restoreFromCloud()
+            _toastMessage.value = when {
+                count > 0 -> "Restored $count messages from cloud"
+                count == 0 -> "No cloud messages found"
+                else -> "Restore failed — check your connection"
+            }
+        }
+    }
+    
     fun signOut() {
         com.example.data.auth.AuthManager.signOut()
         _userEmail.value = null
