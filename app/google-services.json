@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "922500920692",
+    "project_id": "vision-ai-3ad3f",
+    "storage_bucket": "vision-ai-3ad3f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:922500920692:android:d91df90e63f4aa069de821",
+        "android_client_info": {
+          "package_name": "com.anshyadav.vision"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "922500920692-5f3ee4bqbe87pfd9t45von7q69kf78an.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.anshyadav.vision",
+            "certificate_hash": "3e0cc6a6b83bf72bd8ba95718420aba31b726c82"
+          }
+        },
+        {
+          "client_id": "922500920692-ctonce6beanf3dfuhtgiglsjbhv60621.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB55RPTaepi67xF385v02EoM9ZhA7kbQ2c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "922500920692-ctonce6beanf3dfuhtgiglsjbhv60621.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
