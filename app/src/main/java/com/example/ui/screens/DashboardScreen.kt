@@ -632,4 +632,262 @@ private fun VisionRadialCore(
                             ellipseHeight
                         ),
                         style = Stroke(
-                            widt
+                            width = 1.dp.toPx()
+                        )
+                    )
+                }
+
+                // -------------------------------------------------
+                // LONGITUDE LINES
+                // -------------------------------------------------
+
+                for (i in -2..2) {
+
+                    val xOffset =
+                        i * r * 0.22f
+
+                    drawOval(
+                        color = NeonPurple.copy(
+                            alpha = 0.55f
+                        ),
+                        topLeft = Offset(
+                            c.x +
+                                    xOffset -
+                                    r * 0.20f,
+                            c.y - r * 0.76f
+                        ),
+                        size = androidx.compose.ui.geometry.Size(
+                            r * 0.40f,
+                            r * 1.52f
+                        ),
+                        style = Stroke(
+                            width = 1.dp.toPx()
+                        )
+                    )
+                }
+
+                // -------------------------------------------------
+                // SPHERE PARTICLES
+                // -------------------------------------------------
+
+                for (i in 0 until 30) {
+
+                    val angle = Math.toRadians(
+                        (i * 47 % 360).toDouble()
+                    ).toFloat()
+
+                    val distance =
+                        r * (
+                            0.35f +
+                                    ((i * 13) % 45) /
+                                    100f
+                            )
+
+                    drawCircle(
+                        color =
+                            if (i % 2 == 0) {
+                                NeonBlue
+                            } else {
+                                NeonPurple
+                            },
+                        radius = 1.3.dp.toPx(),
+                        center = Offset(
+                            c.x + cos(angle) * distance,
+                            c.y + sin(angle) * distance
+                        )
+                    )
+                }
+
+                // -------------------------------------------------
+                // VISION "V"
+                // -------------------------------------------------
+
+                val vPath = Path().apply {
+
+                    moveTo(
+                        c.x - r * 0.43f,
+                        c.y - r * 0.40f
+                    )
+
+                    lineTo(
+                        c.x,
+                        c.y + r * 0.46f
+                    )
+
+                    lineTo(
+                        c.x + r * 0.43f,
+                        c.y - r * 0.40f
+                    )
+                }
+
+                // V glow
+                drawPath(
+                    path = vPath,
+                    color = NeonBlue.copy(
+                        alpha = 0.22f
+                    ),
+                    style = Stroke(
+                        width = 9.dp.toPx(),
+                        cap = StrokeCap.Round
+                    )
+                )
+
+                // V main
+                drawPath(
+                    path = vPath,
+                    brush = Brush.verticalGradient(
+                        listOf(
+                            NeonBlue,
+                            Color(0xFF75E8FF),
+                            ElectricBlue
+                        )
+                    ),
+                    style = Stroke(
+                        width = 4.dp.toPx(),
+                        cap = StrokeCap.Round
+                    )
+                )
+            }
+        }
+
+        // =========================================================
+        // CHAT
+        // =========================================================
+
+        RadialAction(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .offset(y = (-8).dp),
+            icon = Icons.Default.ChatBubble,
+            title = "CHAT",
+            onClick = onChat
+        )
+
+        // =========================================================
+        // SETTINGS
+        // =========================================================
+
+        RadialAction(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .offset(x = (-3).dp),
+            icon = Icons.Default.Settings,
+            title = "SETTINGS",
+            onClick = onSettings
+        )
+
+        // =========================================================
+        // VOICE
+        // =========================================================
+
+        RadialAction(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .offset(x = 3.dp),
+            icon = Icons.Default.Mic,
+            title = "VOICE",
+            onClick = onVoice
+        )
+
+        // =========================================================
+        // HISTORY
+        // =========================================================
+
+        RadialAction(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .offset(y = 5.dp),
+            icon = Icons.Default.History,
+            title = "HISTORY",
+            onClick = onHistory
+        )
+    }
+}
+
+@Composable
+private fun RadialAction(
+    modifier: Modifier,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    onClick: () -> Unit
+) {
+
+    Column(
+        modifier = modifier
+            .clickable {
+                onClick()
+            },
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+
+        Box(
+            modifier = Modifier
+                .size(70.dp)
+                .shadow(
+                    elevation = 18.dp,
+                    shape = CircleShape,
+                    ambientColor = NeonPurple,
+                    spotColor = NeonBlue
+                )
+                .clip(CircleShape)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            Color(0xFF172D92),
+                            Color(0xFF0A0C35),
+                            Color(0xFF08001A)
+                        )
+                    )
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+
+            Canvas(
+                modifier = Modifier.fillMaxSize()
+            ) {
+
+                drawCircle(
+                    brush = Brush.sweepGradient(
+                        listOf(
+                            NeonBlue,
+                            NeonPurple,
+                            NeonBlue
+                        )
+                    ),
+                    radius =
+                        size.minDimension / 2f -
+                                1.dp.toPx(),
+                    style = Stroke(
+                        width = 2.dp.toPx()
+                    )
+                )
+
+                drawCircle(
+                    color = NeonBlue.copy(
+                        alpha = 0.12f
+                    ),
+                    radius = size.minDimension * 0.38f
+                )
+            }
+
+            Icon(
+                imageVector = icon,
+                contentDescription = title,
+                tint = White,
+                modifier = Modifier.size(31.dp)
+            )
+        }
+
+        Spacer(
+            modifier = Modifier.height(7.dp)
+        )
+
+        Text(
+            text = title,
+            color = White,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.5.sp
+        )
+    }
+}
