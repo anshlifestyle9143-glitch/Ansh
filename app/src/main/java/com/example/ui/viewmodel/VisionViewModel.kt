@@ -130,7 +130,7 @@ class VisionViewModel(application: Application) : AndroidViewModel(application) 
         _toastMessage.value = null
     }
 
-    fun sendMessage(overridePrompt: String? = null) {
+    fun sendMessage(overridePrompt: String? = null, autoSpeak: Boolean = false) {
         val prompt = (overridePrompt ?: _userInput.value).trim()
         if (prompt.isBlank() || _isGenerating.value) return
 
@@ -151,7 +151,7 @@ class VisionViewModel(application: Application) : AndroidViewModel(application) 
             _userInput.value = ""
             _isGenerating.value = true
 
-            repository.sendMessage(
+            val result = repository.sendMessage(
                 sessionId = targetSessionId,
                 userPrompt = prompt,
                 engineType = _activeEngine.value,
@@ -160,6 +160,12 @@ class VisionViewModel(application: Application) : AndroidViewModel(application) 
             )
 
             _isGenerating.value = false
+
+            if (autoSpeak) {
+                result.getOrNull()?.let { assistantMessage ->
+                    ttsManager.speak(assistantMessage.content, assistantMessage.id)
+                }
+            }
         }
     }
 
