@@ -107,7 +107,9 @@ fun VisionApp(viewModel: VisionViewModel) {
                     VisionTab.HOME -> DashboardScreen(
                         viewModel = viewModel,
                         onNavigate = { currentTab = it },
-                        onStartVoiceCall = { showVoiceCall = true }
+                        onStartVoiceCall = { showVoiceCall = true },
+                        onNewChat = { viewModel.createNewSession() },
+                        onShowHistory = { showHistorySheet = true }
                     )
 
                     VisionTab.CHAT -> ChatScreen(
