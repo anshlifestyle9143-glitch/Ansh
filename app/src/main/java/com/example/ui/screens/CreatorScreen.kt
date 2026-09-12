@@ -71,6 +71,7 @@ import com.example.ui.viewmodel.VisionViewModel
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import com.example.data.auth.AuthManager
+import com.example.R
 
 @Composable
 fun CreatorScreen(
