@@ -22,7 +22,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.example.ui.components.EngineSelectorSheet
 import com.example.ui.components.SessionDrawerSheet
-import com.example.ui.components.VisionBottomNav
 import com.example.ui.components.VisionHeader
 import com.example.ui.components.VisionTab
 import com.example.ui.screens.ChatScreen
@@ -30,6 +29,7 @@ import com.example.ui.screens.CreatorScreen
 import com.example.ui.screens.DashboardScreen
 import com.example.ui.screens.EnginesScreen
 import com.example.ui.screens.MemoryVaultScreen
+import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.VoiceConversationScreen
 import com.example.ui.theme.VisionBackground
 import com.example.ui.theme.VisionTheme
@@ -124,16 +124,6 @@ fun VisionApp(viewModel: VisionViewModel) {
                         currentTab = VisionTab.CHAT
                     }
                 )
-            },
-
-            bottomBar = {
-                VisionBottomNav(
-                    currentTab = currentTab,
-
-                    onTabSelected = {
-                        currentTab = it
-                    }
-                )
             }
 
         ) { innerPadding ->
@@ -197,6 +187,26 @@ fun VisionApp(viewModel: VisionViewModel) {
                     VisionTab.CREATOR -> {
                         CreatorScreen(
                             viewModel = viewModel
+                        )
+                    }
+
+                    VisionTab.SETTINGS -> {
+                        SettingsScreen(
+                            onBack = {
+                                currentTab = VisionTab.HOME
+                            },
+
+                            onOpenEngines = {
+                                currentTab = VisionTab.ENGINES
+                            },
+
+                            onOpenMemory = {
+                                currentTab = VisionTab.MEMORY
+                            },
+
+                            onOpenVisionInfo = {
+                                currentTab = VisionTab.CREATOR
+                            }
                         )
                     }
                 }
