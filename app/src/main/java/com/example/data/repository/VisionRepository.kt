@@ -33,22 +33,12 @@ class VisionRepository(private val dao: VisionDao) {
 
     suspend fun createNewSession(title: String = "New Neural Conversation", engineId: String = AiEngineType.VISION_CORE.id): Long {
         return withContext(Dispatchers.IO) {
-            val sessionId = dao.insertSession(
+            dao.insertSession(
                 ChatSession(
                     title = title,
                     activeEngineId = engineId
                 )
             )
-            dao.insertMessage(
-                ChatMessage(
-                    sessionId = sessionId,
-                    role = "ASSISTANT",
-                    content = "Neural link established. Vision is active on **${getEngineById(engineId).displayName}**. How can I help you?",
-                    engineName = getEngineById(engineId).displayName,
-                    latencyMs = 50
-                )
-            )
-            sessionId
         }
     }
 
