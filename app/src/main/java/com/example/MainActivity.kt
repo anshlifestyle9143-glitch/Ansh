@@ -30,10 +30,10 @@ import com.example.ui.screens.CreatorScreen
 import com.example.ui.screens.DashboardScreen
 import com.example.ui.screens.EnginesScreen
 import com.example.ui.screens.MemoryVaultScreen
+import com.example.ui.screens.VoiceConversationScreen
 import com.example.ui.theme.VisionBackground
 import com.example.ui.theme.VisionTheme
 import com.example.ui.viewmodel.VisionViewModel
-import com.example.ui.screens.VoiceConversationScreen
 
 class MainActivity : ComponentActivity() {
 
@@ -42,6 +42,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
         setContent {
             VisionTheme {
                 VisionApp(viewModel = viewModel)
@@ -53,11 +54,26 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun VisionApp(viewModel: VisionViewModel) {
     val context = LocalContext.current
-    var currentTab by remember { mutableStateOf(VisionTab.HOME) }
-    var showVoiceCall by remember { mutableStateOf(false) }
-    var autoStartChatVoice by remember { mutableStateOf(false) }
-    var showEngineSheet by remember { mutableStateOf(false) }
-    var showHistorySheet by remember { mutableStateOf(false) }
+
+    var currentTab by remember {
+        mutableStateOf(VisionTab.HOME)
+    }
+
+    var showVoiceCall by remember {
+        mutableStateOf(false)
+    }
+
+    var autoStartChatVoice by remember {
+        mutableStateOf(false)
+    }
+
+    var showEngineSheet by remember {
+        mutableStateOf(false)
+    }
+
+    var showHistorySheet by remember {
+        mutableStateOf(false)
+    }
 
     val activeEngine by viewModel.activeEngine.collectAsState()
     val sessions by viewModel.sessions.collectAsState()
@@ -66,102 +82,171 @@ fun VisionApp(viewModel: VisionViewModel) {
 
     LaunchedEffect(toastMessage) {
         toastMessage?.let {
-            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+            Toast.makeText(
+                context,
+                it,
+                Toast.LENGTH_SHORT
+            ).show()
+
             viewModel.clearToast()
         }
     }
 
     if (showVoiceCall) {
+
         VoiceConversationScreen(
             viewModel = viewModel,
-            onExit = { showVoiceCall = false }
+            onExit = {
+                showVoiceCall = false
+            }
         )
+
     } else {
+
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = VisionBackground,
+
             topBar = {
                 VisionHeader(
                     activeEngine = activeEngine,
-                    onEngineClick = { showEngineSheet = true },
-                    onHistoryClick = { showHistorySheet = true },
+
+                    onEngineClick = {
+                        showEngineSheet = true
+                    },
+
+                    onHistoryClick = {
+                        showHistorySheet = true
+                    },
+
                     onNewChatClick = {
                         viewModel.createNewSession()
                         currentTab = VisionTab.CHAT
                     }
                 )
             },
+
             bottomBar = {
                 VisionBottomNav(
                     currentTab = currentTab,
-                    onTabSelected = { currentTab = it }
+
+                    onTabSelected = {
+                        currentTab = it
+                    }
                 )
             }
+
         ) { innerPadding ->
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
                     .background(VisionBackground)
             ) {
+
                 when (currentTab) {
-                    VisionTab.HOME -> DashboardScreen(
-                        viewModel = viewModel,
-                        onNavigate = { currentTab = it },
-                        onStartVoiceCall = { showVoiceCall = true },
-                        onNewChat = {
-    viewModel.startNewChat()
-    autoStartChatVoice = true
-                        }
 
-                    VisionTab.CHAT -> ChatScreen(
-                        viewModel = viewModel,
-                        autoStartVoice = autoStartChatVoice,
-                        onAutoStartHandled = { autoStartChatVoice = false }
-                    )
+                    VisionTab.HOME -> {
+                        DashboardScreen(
+                            viewModel = viewModel,
 
-                    VisionTab.MEMORY -> MemoryVaultScreen(
-                        viewModel = viewModel
-                    )
+                            onNavigate = {
+                                currentTab = it
+                            },
 
-                    VisionTab.ENGINES -> EnginesScreen(
-                        viewModel = viewModel
-                    )
+                            onStartVoiceCall = {
+                                showVoiceCall = true
+                            },
 
-                    VisionTab.CREATOR -> CreatorScreen(
-                        viewModel = viewModel
-                    )
+                            onShowHistory = {
+                                showHistorySheet = true
+                            },
+
+                            onNewChat = {
+                                viewModel.startNewChat()
+                                autoStartChatVoice = true
+                                currentTab = VisionTab.CHAT
+                            }
+                        )
+                    }
+
+                    VisionTab.CHAT -> {
+                        ChatScreen(
+                            viewModel = viewModel,
+                            autoStartVoice = autoStartChatVoice,
+
+                            onAutoStartHandled = {
+                                autoStartChatVoice = false
+                            }
+                        )
+                    }
+
+                    VisionTab.MEMORY -> {
+                        MemoryVaultScreen(
+                            viewModel = viewModel
+                        )
+                    }
+
+                    VisionTab.ENGINES -> {
+                        EnginesScreen(
+                            viewModel = viewModel
+                        )
+                    }
+
+                    VisionTab.CREATOR -> {
+                        CreatorScreen(
+                            viewModel = viewModel
+                        )
+                    }
                 }
             }
         }
 
         if (showEngineSheet) {
+
             EngineSelectorSheet(
                 selectedEngine = activeEngine,
+
                 onEngineSelected = { engine ->
                     viewModel.setEngine(engine)
+                    showEngineSheet = false
                 },
-                onDismiss = { showEngineSheet = false }
+
+                onDismiss = {
+                    showEngineSheet = false
+                }
             )
         }
 
         if (showHistorySheet) {
+
             SessionDrawerSheet(
                 sessions = sessions,
                 currentSessionId = currentSessionId,
+
                 onSessionSelected = { sessionId ->
                     viewModel.selectSession(sessionId)
                     currentTab = VisionTab.CHAT
+                    showHistorySheet = false
                 },
+
                 onDeleteSession = { sessionId ->
                     viewModel.deleteSession(sessionId)
                 },
+
                 onNewSession = {
                     viewModel.createNewSession()
                     currentTab = VisionTab.CHAT
+                    showHistorySheet = false
                 },
-                onDismiss = { showHistorySheet = false }
+
+                onDismiss = {
+                    showHistorySheet = false
+                }
             )
         }
     }
 }
+
+इसे replace करो → save करो → फिर सिर्फ "Done" बोलना।
