@@ -55,6 +55,7 @@ fun VisionApp(viewModel: VisionViewModel) {
     val context = LocalContext.current
     var currentTab by remember { mutableStateOf(VisionTab.HOME) }
     var showVoiceCall by remember { mutableStateOf(false) }
+    var autoStartChatVoice by remember { mutableStateOf(false) }
     var showEngineSheet by remember { mutableStateOf(false) }
     var showHistorySheet by remember { mutableStateOf(false) }
 
@@ -108,12 +109,15 @@ fun VisionApp(viewModel: VisionViewModel) {
                         viewModel = viewModel,
                         onNavigate = { currentTab = it },
                         onStartVoiceCall = { showVoiceCall = true },
-                        onNewChat = { viewModel.startNewChat() }
-                        onShowHistory = { showHistorySheet = true }
-                    )
+                        onNewChat = {
+    viewModel.startNewChat()
+    autoStartChatVoice = true
+                        }
 
                     VisionTab.CHAT -> ChatScreen(
-                        viewModel = viewModel
+                        viewModel = viewModel,
+                        autoStartVoice = autoStartChatVoice,
+                        onAutoStartHandled = { autoStartChatVoice = false }
                     )
 
                     VisionTab.MEMORY -> MemoryVaultScreen(
