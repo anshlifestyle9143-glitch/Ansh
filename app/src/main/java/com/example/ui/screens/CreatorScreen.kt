@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material3.AlertDialog
@@ -44,6 +45,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
@@ -133,7 +135,7 @@ fun CreatorScreen(
                     text = "Vision was engineered as a high-performance native Android AI assistant. Featuring autonomous local memory injection, modular multi-model orchestration, and an elegant artistic interface.",
                     style = MaterialTheme.typography.bodySmall,
                     color = VisionTextSecondary,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    textAlign = TextAlign.Center,
                     lineHeight = 18.sp
                 )
             }
@@ -239,6 +241,74 @@ fun CreatorScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // System Performance Matrix
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = VisionCardBg,
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                VisionCardBorder.copy(alpha = 0.8f)
+            ),
+            shadowElevation = 1.dp,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp)
+            ) {
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Memory,
+                        contentDescription = null,
+                        tint = VisionDeepPlum,
+                        modifier = Modifier.size(20.dp)
+                    )
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Text(
+                        text = "System Performance Matrix",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontFamily = FontFamily.Serif,
+                        fontStyle = FontStyle.Italic,
+                        fontWeight = FontWeight.Bold,
+                        color = VisionDeepPlum
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                SpecRow(
+                    label = "Platform",
+                    value = "Native Android (Kotlin Compose)"
+                )
+
+                SpecRow(
+                    label = "Target SDK",
+                    value = "Android 16 (API 36)"
+                )
+
+                SpecRow(
+                    label = "Memory Persistence",
+                    value = "Room SQLite + KSP"
+                )
+
+                SpecRow(
+                    label = "Audio Core",
+                    value = "Android Native TTS + STT"
+                )
+
+                SpecRow(
+                    label = "Application ID",
+                    value = "com.anshyadav.vision"
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         // Data Storage & Reset Card
         Surface(
             shape = RoundedCornerShape(16.dp),
@@ -319,6 +389,7 @@ fun CreatorScreen(
         Spacer(modifier = Modifier.height(24.dp))
     }
 
+    // Reset Confirmation Dialog
     if (showClearDialog) {
         AlertDialog(
             onDismissRequest = { showClearDialog = false },
@@ -363,6 +434,36 @@ fun CreatorScreen(
                     )
                 }
             }
+        )
+    }
+}
+
+@Composable
+private fun SpecRow(
+    label: String,
+    value: String
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.SemiBold,
+            color = VisionTextSecondary,
+            modifier = Modifier.weight(0.38f)
+        )
+
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodySmall,
+            color = VisionTextMuted,
+            textAlign = TextAlign.End,
+            modifier = Modifier.weight(0.62f)
         )
     }
 }
