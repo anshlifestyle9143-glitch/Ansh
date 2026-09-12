@@ -194,6 +194,24 @@ class VisionViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    private val _userEmail = MutableStateFlow(com.example.data.auth.AuthManager.currentUserEmail())
+    val userEmail: StateFlow<String?> = _userEmail
+
+    fun onSignInResult(result: Result<String>) {
+        result.onSuccess { email ->
+            _userEmail.value = email
+            _toastMessage.value = "Signed in as $email"
+        }.onFailure { e ->
+            _toastMessage.value = "Sign-in failed: ${e.message}"
+        }
+    }
+
+    fun signOut() {
+        com.example.data.auth.AuthManager.signOut()
+        _userEmail.value = null
+        _toastMessage.value = "Signed out"
+    }
+
     fun toggleSpeak(message: ChatMessage) {
         ttsManager.speak(message.content, message.id)
     }
