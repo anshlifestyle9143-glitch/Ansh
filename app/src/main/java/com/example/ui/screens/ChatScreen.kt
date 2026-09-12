@@ -1,15 +1,10 @@
 package com.example.ui.screens
 
-import android.app.Activity
-import android.content.Intent
-import android.speech.RecognizerIntent
+import android.Manifest
+import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,16 +20,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -44,6 +35,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -52,35 +44,36 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.example.data.model.AiEngineType
-import com.example.data.model.ChatMessage
 import com.example.ui.components.ChatMessageItem
 import com.example.ui.theme.VisionBackground
 import com.example.ui.theme.VisionCardBg
 import com.example.ui.theme.VisionCardBorder
 import com.example.ui.theme.VisionDeepPlum
-import com.example.ui.theme.VisionEmerald
-import com.example.ui.theme.VisionLilacLight
 import com.example.ui.theme.VisionLilacPill
 import com.example.ui.theme.VisionPrimaryPurple
-import com.example.ui.theme.VisionSurface
 import com.example.ui.theme.VisionTextMuted
 import com.example.ui.theme.VisionTextPrimary
 import com.example.ui.theme.VisionTextSecondary
 import com.example.ui.viewmodel.VisionViewModel
-import java.util.Locale
+import com.example.util.LiveSpeechRecognizer
 
 @Composable
 fun ChatScreen(
     viewModel: VisionViewModel,
+    autoStartVoice: Boolean = false,
+    onAutoStartHandled: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val messages by viewModel.messages.collectAsState()
     val isGenerating by viewModel.isGenerating.collectAsState()
     val userInput by viewModel.userInput.collectAsState()
@@ -89,25 +82,43 @@ fun ChatScreen(
     val currentSpeakingId by viewModel.ttsManager.currentSpeakingId.collectAsState()
 
     val listState = rememberLazyListState()
+    val speechRecognizer = remember { LiveSpeechRecognizer(context) }
 
-    // Auto-scroll to latest message
-    LaunchedEffect(messages.size, isGenerating) {
-        if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.size - 1)
+    DisposableEffect(Unit) {
+        onDispose { speechRecognizer.destroy() }
+    }
+
+    fun startListening() {
+        speechRecognizer.start(
+            onPartial = { text -> viewModel.onUserInputChange(text) },
+            onFinal = { text -> viewModel.onUserInputChange(text) },
+            onListeningChange = {},
+            onError = {}
+        )
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted -> if (granted) startListening() }
+
+    fun requestListening() {
+        val hasPermission = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (hasPermission) startListening() else permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+    }
+
+    LaunchedEffect(autoStartVoice) {
+        if (autoStartVoice) {
+            requestListening()
+            onAutoStartHandled()
         }
     }
 
-    // Voice recognition launcher
-    val speechLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            val spokenText = result.data
-                ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
-                ?.firstOrNull()
-            if (!spokenText.isNullOrBlank()) {
-                viewModel.onUserInputChange(spokenText)
-            }
+    LaunchedEffect(messages.size, isGenerating) {
+        if (messages.isNotEmpty()) {
+            listState.animateScrollToItem(messages.size - 1)
         }
     }
 
@@ -117,7 +128,6 @@ fun ChatScreen(
             .background(VisionBackground)
             .imePadding()
     ) {
-        // Message list or empty starter guide
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -151,29 +161,12 @@ fun ChatScreen(
             }
         }
 
-        // Quick suggestions chips
-        QuickPromptChips(
-            onPromptSelected = { prompt -> viewModel.sendMessage(prompt) }
-        )
-
-        // Input Bar
         ChatInputBar(
             value = userInput,
             onValueChange = { viewModel.onUserInputChange(it) },
             onSend = { viewModel.sendMessage() },
             isGenerating = isGenerating,
-            onVoiceClick = {
-                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                    putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
-                    putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak to Vision AI...")
-                }
-                try {
-                    speechLauncher.launch(intent)
-                } catch (e: Exception) {
-                    // Speech intent unavailable
-                }
-            }
+            onVoiceClick = { requestListening() }
         )
     }
 }
@@ -223,66 +216,6 @@ fun EmptyChatGuide(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
             textAlign = androidx.compose.ui.text.style.TextAlign.Center
         )
-
-        Spacer(modifier = Modifier.height(18.dp))
-
-        Text(
-            text = "SUGGESTED INITIALIZATIONS",
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 1.2.sp,
-            color = VisionPrimaryPurple
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        val prompts = listOf(
-            "Who created you and what is your architecture?",
-            "What facts are currently in your Memory Vault?",
-            "Write a clean Jetpack Compose Architecture sample",
-            "Run Vision HUD system diagnostics"
-        )
-
-        prompts.forEach { prompt ->
-            Surface(
-                shape = RoundedCornerShape(14.dp),
-                color = VisionCardBg,
-                border = androidx.compose.foundation.BorderStroke(1.dp, VisionCardBorder.copy(alpha = 0.7f)),
-                shadowElevation = 1.dp,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .clickable { onPromptClick(prompt) }
-            ) {
-                Row(
-                    modifier = Modifier.padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(28.dp)
-                            .clip(CircleShape)
-                            .background(VisionLilacPill),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.AutoAwesome,
-                            contentDescription = null,
-                            tint = VisionDeepPlum,
-                            modifier = Modifier.size(15.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = prompt,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Medium,
-                        color = VisionTextPrimary
-                    )
-                }
-            }
-        }
     }
 }
 
@@ -321,45 +254,6 @@ fun ThinkingIndicator(engine: AiEngineType) {
                 color = VisionTextSecondary,
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
             )
-        }
-    }
-}
-
-@Composable
-fun QuickPromptChips(
-    onPromptSelected: (String) -> Unit
-) {
-    val quickItems = listOf(
-        "🧠 Check Memory Vault" to "What facts do you remember about me?",
-        "⚡ Diagnostics" to "Run Vision HUD system diagnostics",
-        "💻 Kotlin Code" to "Explain Kotlin Coroutines and StateFlow in Jetpack Compose",
-        "🎨 Creative Mode" to "Generate 3 innovative Android app concepts for 2026",
-        "👤 Creator Bio" to "Who created Vision AI and what was their design vision?"
-    )
-
-    LazyRow(
-        contentPadding = PaddingValues(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
-    ) {
-        items(quickItems) { item ->
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = VisionCardBg,
-                border = androidx.compose.foundation.BorderStroke(1.dp, VisionCardBorder.copy(alpha = 0.7f)),
-                modifier = Modifier
-                    .clip(RoundedCornerShape(16.dp))
-                    .clickable { onPromptSelected(item.second) }
-            ) {
-                Text(
-                    text = item.first,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = VisionTextSecondary,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                )
-            }
         }
     }
 }
@@ -445,4 +339,3 @@ fun ChatInputBar(
         }
     }
 }
-
