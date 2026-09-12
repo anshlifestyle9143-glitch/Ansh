@@ -77,9 +77,6 @@ fun DashboardScreen(
         )
     ) {
 
-        // ---------------------------------------------------------
-        // SYSTEM STATUS
-        // ---------------------------------------------------------
         item {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -145,9 +142,6 @@ fun DashboardScreen(
             }
         }
 
-        // ---------------------------------------------------------
-        // VISION AI CORE
-        // ---------------------------------------------------------
         item {
             RadialHub(
                 onCenterClick = {
@@ -173,9 +167,6 @@ private fun RadialHub(
             label = "vision_ai_core"
         )
 
-    // ---------------------------------------------------------
-    // CORE PULSE
-    // ---------------------------------------------------------
     val corePulse by infiniteTransition.animateFloat(
         initialValue = 0.94f,
         targetValue = 1.06f,
@@ -189,9 +180,6 @@ private fun RadialHub(
         label = "corePulse"
     )
 
-    // ---------------------------------------------------------
-    // OUTER RING ROTATION
-    // ---------------------------------------------------------
     val rotation by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
@@ -204,9 +192,6 @@ private fun RadialHub(
         label = "rotation"
     )
 
-    // ---------------------------------------------------------
-    // GLOW PULSE
-    // ---------------------------------------------------------
     val glowAlpha by infiniteTransition.animateFloat(
         initialValue = 0.20f,
         targetValue = 0.50f,
@@ -227,9 +212,6 @@ private fun RadialHub(
         contentAlignment = Alignment.Center
     ) {
 
-        // -------------------------------------------------------
-        // OUTER ROTATING AI RING
-        // -------------------------------------------------------
         Box(
             modifier = Modifier
                 .size(285.dp)
@@ -245,9 +227,6 @@ private fun RadialHub(
                 )
         )
 
-        // -------------------------------------------------------
-        // SECOND AI RING
-        // -------------------------------------------------------
         Box(
             modifier = Modifier
                 .size(220.dp)
@@ -264,9 +243,6 @@ private fun RadialHub(
                 )
         )
 
-        // -------------------------------------------------------
-        // AI ENERGY GLOW
-        // -------------------------------------------------------
         Box(
             modifier = Modifier
                 .size(190.dp)
@@ -287,9 +263,20 @@ private fun RadialHub(
                 )
         )
 
-        // -------------------------------------------------------
         // LEFT — VOICE TO TEXT
-        // -------------------------------------------------------
+        HubAction(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .padding(start = 8.dp),
+            icon = Icons.Default.Mic,
+            title = "Voice",
+            subtitle = "Text",
+            onClick = {
+                onNavigate(VisionTab.CHAT)
+            }
+        )
+
+        // RIGHT — VOICE TO VOICE
         HubAction(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
@@ -302,24 +289,7 @@ private fun RadialHub(
             }
         )
 
-        // -------------------------------------------------------
-        // RIGHT — VOICE TO VOICE
-        // -------------------------------------------------------
-        HubAction(
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .padding(end = 8.dp),
-            icon = Icons.Default.RecordVoiceOver,
-            title = "Voice",
-            subtitle = "Voice",
-            onClick = {
-                onNavigate(VisionTab.CHAT)
-            }
-        )
-
-        // -------------------------------------------------------
         // BOTTOM — HISTORY
-        // -------------------------------------------------------
         HubAction(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -332,9 +302,7 @@ private fun RadialHub(
             }
         )
 
-        // -------------------------------------------------------
         // MAIN VISION AI CORE
-        // -------------------------------------------------------
         Surface(
             modifier = Modifier
                 .size(148.dp)
@@ -379,7 +347,6 @@ private fun RadialHub(
                 contentAlignment = Alignment.Center
             ) {
 
-                // New V logo
                 Image(
                     painter = painterResource(
                         id = R.drawable.ic_vision_logo
@@ -412,9 +379,6 @@ private fun HubAction(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
 
-        // -------------------------------------------------------
-        // ACTION CIRCLE
-        // -------------------------------------------------------
         Surface(
             modifier = Modifier.size(58.dp),
             shape = CircleShape,
