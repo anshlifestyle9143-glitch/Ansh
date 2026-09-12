@@ -20,9 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.DeleteForever
-import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.VerifiedUser
@@ -31,8 +29,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -78,14 +74,12 @@ fun CreatorScreen(
     viewModel: VisionViewModel,
     modifier: Modifier = Modifier
 ) {
-    val customApiKey by viewModel.customApiKey.collectAsState()
+
     val context = LocalContext.current
     val scrollState = rememberScrollState()
     val coroutineScope = rememberCoroutineScope()
     val userEmail by viewModel.userEmail.collectAsState()
-    
-    var showClearDialog by remember { mutableStateOf(false) }
-    var apiKeyInput by remember(customApiKey) { mutableStateOf(customApiKey) }
+    var showClearDialog by remember { mutableStateOf(false) 
 
     Column(
         modifier = modifier
@@ -157,35 +151,8 @@ fun CreatorScreen(
                         color = VisionLilacPill,
                         border = androidx.compose.foundation.BorderStroke(1.dp, VisionCardBorder)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                        ) {
-                            Icon(Icons.Default.VerifiedUser, contentDescription = null, tint = VisionEmerald, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Native APK v2.0", style = MaterialTheme.typography.labelSmall, color = VisionDeepPlum, fontWeight = FontWeight.Bold)
-                        }
-                    }
-
-                    Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        color = VisionLilacPill,
-                        border = androidx.compose.foundation.BorderStroke(1.dp, VisionCardBorder)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                        ) {
-                            Icon(Icons.Default.Code, contentDescription = null, tint = VisionIndigo, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("com.anshyadav.vision", style = MaterialTheme.typography.labelSmall, color = VisionDeepPlum, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
+                        
+    Spacer(modifier = Modifier.height(16.dp))
 
         Surface(
             shape = RoundedCornerShape(16.dp),
@@ -247,33 +214,6 @@ fun CreatorScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
         
-        // API Key Settings Card
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = VisionCardBg,
-            border = androidx.compose.foundation.BorderStroke(1.dp, VisionCardBorder.copy(alpha = 0.8f)),
-            shadowElevation = 1.dp,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Key,
-                        contentDescription = null,
-                        tint = VisionPrimaryPurple,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Gemini Cloud Neural Key",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontFamily = FontFamily.Serif,
-                        fontStyle = FontStyle.Italic,
-                        fontWeight = FontWeight.Bold,
-                        color = VisionDeepPlum
-                    )
-                }
-
                 Spacer(modifier = Modifier.height(6.dp))
 
                 Text(
