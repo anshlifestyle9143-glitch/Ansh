@@ -63,6 +63,7 @@ import com.example.ui.viewmodel.VisionViewModel
 fun DashboardScreen(
     viewModel: VisionViewModel,
     onNavigate: (VisionTab) -> Unit,
+    onStartVoiceCall: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val activeEngine by viewModel.activeEngine.collectAsState()
@@ -152,7 +153,8 @@ fun DashboardScreen(
                 onCenterClick = {
                     onNavigate(VisionTab.CHAT)
                 },
-                onNavigate = onNavigate
+                onNavigate = onNavigate,
+                onStartVoiceCall = onStartVoiceCall
             )
         }
     }
@@ -162,7 +164,8 @@ fun DashboardScreen(
 @Composable
 private fun RadialHub(
     onCenterClick: () -> Unit,
-    onNavigate: (VisionTab) -> Unit
+    onNavigate: (VisionTab) -> Unit,
+    onStartVoiceCall: () -> Unit
 ) {
 
     val infiniteTransition =
@@ -289,13 +292,13 @@ private fun RadialHub(
         // -------------------------------------------------------
         HubAction(
             modifier = Modifier
-                .align(Alignment.CenterStart)
-                .padding(start = 8.dp),
-            icon = Icons.Default.Mic,
+                .align(Alignment.CenterEnd)
+                .padding(end = 8.dp),
+            icon = Icons.Default.RecordVoiceOver,
             title = "Voice",
-            subtitle = "Text",
+            subtitle = "Voice",
             onClick = {
-                onNavigate(VisionTab.CHAT)
+                onStartVoiceCall()
             }
         )
 
