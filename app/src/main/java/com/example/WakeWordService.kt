@@ -1,271 +1,152 @@
-package com.example
+package com.example.service
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.Service
 import android.content.Intent
-import android.os.Bundle
-import android.widget.Toast
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.BackHandler
-import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
-import androidx.activity.viewModels
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import com.example.ui.components.EngineSelectorSheet
-import com.example.ui.components.SessionDrawerSheet
-import com.example.ui.components.VisionHeader
-import com.example.ui.components.VisionTab
-import com.example.ui.screens.ChatScreen
-import com.example.ui.screens.CreatorScreen
-import com.example.ui.screens.DashboardScreen
-import com.example.ui.screens.EnginesScreen
-import com.example.ui.screens.MemoryVaultScreen
-import com.example.ui.screens.SettingsScreen
-import com.example.ui.screens.VoiceConversationScreen
-import com.example.ui.theme.VisionBackground
-import com.example.ui.theme.VisionTheme
-import com.example.ui.viewmodel.VisionViewModel
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
+import android.os.Build
+import android.os.IBinder
+import androidx.core.app.NotificationCompat
+import com.example.MainActivity
+import com.example.util.LiveSpeechRecognizer
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
-class MainActivity : ComponentActivity() {
+class WakeWordService : Service() {
 
-    private val viewModel: VisionViewModel by viewModels()
-    private var pendingVoiceCall = mutableStateOf(false)
+    private val serviceScope = CoroutineScope(Dispatchers.Main + Job())
+    private var recognizer: LiveSpeechRecognizer? = null
+    private var audioManager: AudioManager? = null
+    private var focusRequest: AudioFocusRequest? = null
+    private var running = false
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-        handleIntent(intent)
+    private val wakeWords = listOf("hello vision", "hey vision", "vision")
 
-        setContent {
-            VisionTheme {
-                VisionApp(viewModel = viewModel, pendingVoiceCall = pendingVoiceCall)
-            }
+    override fun onCreate() {
+        super.onCreate()
+        audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
+        recognizer = LiveSpeechRecognizer(this)
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        startForeground(NOTIFICATION_ID, buildNotification())
+        if (!running) {
+            running = true
+            startCycle()
+        }
+        return START_STICKY
+    }
+
+    private fun requestDuckFocus(): Boolean {
+        val am = audioManager ?: return false
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val attrs = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ASSISTANT)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                .build()
+            focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+                .setAudioAttributes(attrs)
+                .build()
+            am.requestAudioFocus(focusRequest!!) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+        } else {
+            @Suppress("DEPRECATION")
+            am.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
         }
     }
 
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        setIntent(intent)
-        handleIntent(intent)
-    }
-
-    private fun handleIntent(intent: Intent?) {
-        if (intent?.getBooleanExtra(EXTRA_OPEN_VOICE_CALL, false) == true) {
-            pendingVoiceCall.value = true
+    private fun abandonFocus() {
+        val am = audioManager ?: return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            focusRequest?.let { am.abandonAudioFocusRequest(it) }
+        } else {
+            @Suppress("DEPRECATION")
+            am.abandonAudioFocus(null)
         }
     }
 
-    companion object {
-        const val EXTRA_OPEN_VOICE_CALL = "open_voice_call"
-    }
-}
+    private fun startCycle() {
+        serviceScope.launch {
+            while (running) {
+                requestDuckFocus()
 
-@Composable
-fun VisionApp(
-    viewModel: VisionViewModel,
-    pendingVoiceCall: MutableState<Boolean>
-) {
+                var detected = false
+                val cycleDone = CompletableDeferred<Unit>()
 
-    val context = LocalContext.current
-
-    var currentTab by remember { mutableStateOf(VisionTab.HOME) }
-    var showVoiceCall by remember { mutableStateOf(false) }
-    var autoStartChatVoice by remember { mutableStateOf(false) }
-    var showEngineSheet by remember { mutableStateOf(false) }
-    var showHistorySheet by remember { mutableStateOf(false) }
-
-    val activeEngine by viewModel.activeEngine.collectAsState()
-    val sessions by viewModel.sessions.collectAsState()
-    val currentSessionId by viewModel.currentSessionId.collectAsState()
-    val toastMessage by viewModel.toastMessage.collectAsState()
-    val wakeWordEnabled by viewModel.wakeWordEnabled.collectAsState()
-
-    LaunchedEffect(toastMessage) {
-        toastMessage?.let {
-            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
-            viewModel.clearToast()
-        }
-    }
-
-    LaunchedEffect(pendingVoiceCall.value) {
-        if (pendingVoiceCall.value) {
-            viewModel.stopWakeWordService()
-            showVoiceCall = true
-            pendingVoiceCall.value = false
-        }
-    }
-
-    /*
-     * ANDROID BACK HANDLING
-     *
-     * Priority:
-     * 1. Voice screen -> Home
-     * 2. Engine sheet -> close sheet
-     * 3. History sheet -> close sheet
-     * 4. Any inner screen -> Home
-     * 5. Home -> normal Android back
-     */
-    BackHandler(
-        enabled = showVoiceCall ||
-                showEngineSheet ||
-                showHistorySheet ||
-                currentTab != VisionTab.HOME
-    ) {
-        when {
-            showVoiceCall -> {
-                showVoiceCall = false
-                if (wakeWordEnabled) viewModel.startWakeWordService()
-            }
-
-            showEngineSheet -> {
-                showEngineSheet = false
-            }
-
-            showHistorySheet -> {
-                showHistorySheet = false
-            }
-
-            currentTab != VisionTab.HOME -> {
-                currentTab = VisionTab.HOME
-                autoStartChatVoice = false
-            }
-        }
-    }
-
-    if (showVoiceCall) {
-
-        VoiceConversationScreen(
-            viewModel = viewModel,
-            onExit = {
-                showVoiceCall = false
-                currentTab = VisionTab.HOME
-                if (wakeWordEnabled) viewModel.startWakeWordService()
-            }
-        )
-
-    } else {
-
-        Scaffold(
-            modifier = Modifier.fillMaxSize(),
-            containerColor = VisionBackground,
-
-            topBar = {
-                VisionHeader(
-                    activeEngine = activeEngine,
-                    onEngineClick = { showEngineSheet = true },
-                    onHistoryClick = { showHistorySheet = true },
-                    onNewChatClick = {
-                        viewModel.startNewChat()
-                        autoStartChatVoice = false
-                        currentTab = VisionTab.CHAT
+                recognizer?.start(
+                    onPartial = {},
+                    onFinal = { text ->
+                        val lower = text.lowercase()
+                        if (wakeWords.any { lower.contains(it) }) {
+                            detected = true
+                        }
+                        if (!cycleDone.isCompleted) cycleDone.complete(Unit)
+                    },
+                    onListeningChange = {},
+                    onError = {
+                        if (!cycleDone.isCompleted) cycleDone.complete(Unit)
                     }
                 )
-            }
 
-        ) { innerPadding ->
+                withTimeoutOrNull(6000) { cycleDone.await() }
+                abandonFocus()
 
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .background(VisionBackground)
-            ) {
-
-                when (currentTab) {
-
-                    VisionTab.HOME -> {
-                        DashboardScreen(
-                            viewModel = viewModel,
-                            onNavigate = { destination -> currentTab = destination },
-                            onStartVoiceCall = {
-                                viewModel.stopWakeWordService()
-                                showVoiceCall = true
-                            },
-                            onShowHistory = { showHistorySheet = true },
-                            onNewChat = {
-                                viewModel.startNewChat()
-                                autoStartChatVoice = false
-                                currentTab = VisionTab.CHAT
-                            }
-                        )
-                    }
-
-                    VisionTab.CHAT -> {
-                        ChatScreen(
-                            viewModel = viewModel,
-                            autoStartVoice = autoStartChatVoice,
-                            onAutoStartHandled = { autoStartChatVoice = false }
-                        )
-                    }
-
-                    VisionTab.MEMORY -> {
-                        MemoryVaultScreen(viewModel = viewModel)
-                    }
-
-                    VisionTab.ENGINES -> {
-                        EnginesScreen(viewModel = viewModel)
-                    }
-
-                    VisionTab.CREATOR -> {
-                        CreatorScreen(viewModel = viewModel)
-                    }
-
-                    VisionTab.SETTINGS -> {
-                        SettingsScreen(
-                            viewModel = viewModel,
-                            onBack = { currentTab = VisionTab.HOME },
-                            onOpenEngines = { currentTab = VisionTab.ENGINES },
-                            onOpenMemory = { currentTab = VisionTab.MEMORY },
-                            onOpenVisionInfo = { currentTab = VisionTab.CREATOR }
-                        )
-                    }
+                if (detected) {
+                    launchVoiceCall()
+                    running = false
+                    stopSelf()
+                    break
                 }
+
+                delay(700)
             }
         }
+    }
 
-        if (showEngineSheet) {
-            EngineSelectorSheet(
-                selectedEngine = activeEngine,
-                onEngineSelected = { engine ->
-                    viewModel.setEngine(engine)
-                    showEngineSheet = false
-                },
-                onDismiss = { showEngineSheet = false }
+    private fun launchVoiceCall() {
+        val intent = Intent(this, MainActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            putExtra(MainActivity.EXTRA_OPEN_VOICE_CALL, true)
+        }
+        startActivity(intent)
+    }
+
+    private fun buildNotification(): Notification {
+        val channelId = "vision_wake_word"
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                channelId, "Vision Wake Word", NotificationManager.IMPORTANCE_LOW
             )
+            val manager = getSystemService(NotificationManager::class.java)
+            manager.createNotificationChannel(channel)
         }
 
-        if (showHistorySheet) {
-            SessionDrawerSheet(
-                sessions = sessions,
-                currentSessionId = currentSessionId,
-                onSessionSelected = { sessionId ->
-                    viewModel.selectSession(sessionId)
-                    currentTab = VisionTab.CHAT
-                    showHistorySheet = false
-                },
-                onDeleteSession = { sessionId ->
-                    viewModel.deleteSession(sessionId)
-                },
-                onNewSession = {
-                    viewModel.startNewChat()
-                    autoStartChatVoice = false
-                    currentTab = VisionTab.CHAT
-                    showHistorySheet = false
-                },
-                onDismiss = { showHistorySheet = false }
-            )
-        }
+        return NotificationCompat.Builder(this, channelId)
+            .setContentTitle("Vision is listening")
+            .setContentText("Say \"Hey Vision\" to start talking")
+            .setSmallIcon(android.R.drawable.ic_btn_speak_now)
+            .setOngoing(true)
+            .build()
+    }
+
+    override fun onDestroy() {
+        running = false
+        recognizer?.destroy()
+        abandonFocus()
+        super.onDestroy()
+    }
+
+    override fun onBind(intent: Intent?): IBinder? = null
+
+    companion object {
+        private const val NOTIFICATION_ID = 4201
     }
 }
