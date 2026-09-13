@@ -91,7 +91,18 @@ class WakeWordService : Service() {
 
                     running = false
 
+                    /*
+                     * IMPORTANT: stop() alone does not fully
+                     * release the AudioRecord resource. We must
+                     * also call release() here (not just in
+                     * onDestroy(), which runs asynchronously)
+                     * so the microphone is completely free
+                     * before the voice-call screen tries to
+                     * start its own SpeechRecognizer.
+                     */
                     engine.stop()
+                    engine.release()
+                    wakeWordEngine = null
 
                     launchVoiceCall()
 
