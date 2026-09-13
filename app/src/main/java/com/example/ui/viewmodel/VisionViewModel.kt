@@ -19,6 +19,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import android.content.Intent
+import androidx.core.content.ContextCompat
+import com.example.service.WakeWordService
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class VisionViewModel(application: Application) : AndroidViewModel(application) {
@@ -236,6 +239,24 @@ class VisionViewModel(application: Application) : AndroidViewModel(application) 
 
     fun toggleSpeak(message: ChatMessage) {
         ttsManager.speak(message.content, message.id)
+    }
+
+    private val _wakeWordEnabled = MutableStateFlow(false)
+    val wakeWordEnabled: StateFlow<Boolean> = _wakeWordEnabled.asStateFlow()
+
+    fun setWakeWordEnabled(enabled: Boolean) {
+        _wakeWordEnabled.value = enabled
+        if (enabled) startWakeWordService() else stopWakeWordService()
+    }
+
+    fun startWakeWordService() {
+        val context = getApplication<Application>()
+        ContextCompat.startForegroundService(context, Intent(context, WakeWordService::class.java))
+    }
+
+    fun stopWakeWordService() {
+        val context = getApplication<Application>()
+        context.stopService(Intent(context, WakeWordService::class.java))
     }
 
     override fun onCleared() {
