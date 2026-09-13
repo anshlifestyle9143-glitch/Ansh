@@ -5,148 +5,205 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
-import android.media.AudioAttributes
-import android.media.AudioFocusRequest
-import android.media.AudioManager
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.example.MainActivity
-import com.example.util.LiveSpeechRecognizer
-import kotlinx.coroutines.CompletableDeferred
+import com.rementia.openwakeword.lib.DetectionMode
+import com.rementia.openwakeword.lib.WakeWordEngine
+import com.rementia.openwakeword.lib.WakeWordModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 
 class WakeWordService : Service() {
 
-    private val serviceScope = CoroutineScope(Dispatchers.Main + Job())
-    private var recognizer: LiveSpeechRecognizer? = null
-    private var audioManager: AudioManager? = null
-    private var focusRequest: AudioFocusRequest? = null
-    private var running = false
+    private val serviceScope =
+        CoroutineScope(Dispatchers.Default + SupervisorJob())
 
-    private val wakeWords = listOf("hello vision", "hey vision", "vision")
+    private var wakeWordEngine: WakeWordEngine? = null
+    private var detectionJob: Job? = null
+    private var running = false
 
     override fun onCreate() {
         super.onCreate()
-        audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
-        recognizer = LiveSpeechRecognizer(this)
+
+        wakeWordEngine = WakeWordEngine(
+            context = this,
+            models = listOf(
+                WakeWordModel(
+                    name = "Hey Jarvis",
+                    modelPath = "hey_jarvis_v0.1.onnx",
+                    threshold = 0.10f
+                )
+            ),
+            detectionMode = DetectionMode.SINGLE_BEST,
+            detectionCooldownMs = 2000L
+        )
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        startForeground(NOTIFICATION_ID, buildNotification())
+    override fun onStartCommand(
+        intent: Intent?,
+        flags: Int,
+        startId: Int
+    ): Int {
+
+        startForeground(
+            NOTIFICATION_ID,
+            buildNotification()
+        )
+
         if (!running) {
             running = true
-            startCycle()
+            startWakeWordDetection()
         }
+
         return START_STICKY
     }
 
-    private fun requestDuckFocus(): Boolean {
-        val am = audioManager ?: return false
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val attrs = AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_ASSISTANT)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                .build()
-            focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
-                .setAudioAttributes(attrs)
-                .build()
-            am.requestAudioFocus(focusRequest!!) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
-        } else {
-            @Suppress("DEPRECATION")
-            am.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
-        }
-    }
+    private fun startWakeWordDetection() {
 
-    private fun abandonFocus() {
-        val am = audioManager ?: return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            focusRequest?.let { am.abandonAudioFocusRequest(it) }
-        } else {
-            @Suppress("DEPRECATION")
-            am.abandonAudioFocus(null)
-        }
-    }
+        val engine = wakeWordEngine ?: return
 
-    private fun startCycle() {
-        serviceScope.launch {
-            while (running) {
-                requestDuckFocus()
+        detectionJob?.cancel()
 
-                var detected = false
-                val cycleDone = CompletableDeferred<Unit>()
+        detectionJob = serviceScope.launch {
 
-                recognizer?.start(
-                    onPartial = {},
-                    onFinal = { text ->
-                        val lower = text.lowercase()
-                        if (wakeWords.any { lower.contains(it) }) {
-                            detected = true
-                        }
-                        if (!cycleDone.isCompleted) cycleDone.complete(Unit)
-                    },
-                    onListeningChange = {},
-                    onError = {
-                        if (!cycleDone.isCompleted) cycleDone.complete(Unit)
+            try {
+
+                engine.detections.collect { detection ->
+
+                    if (!running) {
+                        return@collect
                     }
-                )
 
-                withTimeoutOrNull(6000) { cycleDone.await() }
-                abandonFocus()
+                    Log.d(
+                        TAG,
+                        "Wake word detected: " +
+                                "${detection.model.name}, " +
+                                "score=${detection.score}"
+                    )
 
-                if (detected) {
-                    launchVoiceCall()
                     running = false
+
+                    engine.stop()
+
+                    launchVoiceCall()
+
                     stopSelf()
-                    break
                 }
 
-                delay(700)
+            } catch (e: Exception) {
+
+                Log.e(
+                    TAG,
+                    "Wake word detection stopped",
+                    e
+                )
             }
+        }
+
+        try {
+
+            engine.start()
+
+        } catch (e: IllegalStateException) {
+
+            Log.e(
+                TAG,
+                "Unable to start wake word engine. " +
+                        "Check RECORD_AUDIO permission.",
+                e
+            )
+
+            running = false
+            stopSelf()
         }
     }
 
     private fun launchVoiceCall() {
-        val intent = Intent(this, MainActivity::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-            putExtra(MainActivity.EXTRA_OPEN_VOICE_CALL, true)
+
+        val intent = Intent(
+            this,
+            MainActivity::class.java
+        ).apply {
+
+            addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK or
+                        Intent.FLAG_ACTIVITY_CLEAR_TOP
+            )
+
+            putExtra(
+                MainActivity.EXTRA_OPEN_VOICE_CALL,
+                true
+            )
         }
+
         startActivity(intent)
     }
 
     private fun buildNotification(): Notification {
+
         val channelId = "vision_wake_word"
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+
             val channel = NotificationChannel(
-                channelId, "Vision Wake Word", NotificationManager.IMPORTANCE_LOW
+                channelId,
+                "Vision Wake Word",
+                NotificationManager.IMPORTANCE_LOW
             )
-            val manager = getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(channel)
+
+            getSystemService(
+                NotificationManager::class.java
+            ).createNotificationChannel(channel)
         }
 
-        return NotificationCompat.Builder(this, channelId)
+        return NotificationCompat.Builder(
+            this,
+            channelId
+        )
             .setContentTitle("Vision is listening")
-            .setContentText("Say \"Hey Vision\" to start talking")
-            .setSmallIcon(android.R.drawable.ic_btn_speak_now)
+            .setContentText(
+                "Say \"Hey Jarvis\" to start talking"
+            )
+            .setSmallIcon(
+                android.R.drawable.ic_btn_speak_now
+            )
             .setOngoing(true)
             .build()
     }
 
     override fun onDestroy() {
+
         running = false
-        recognizer?.destroy()
-        abandonFocus()
+
+        detectionJob?.cancel()
+
+        wakeWordEngine?.release()
+
+        wakeWordEngine = null
+
+        serviceScope.cancel()
+
         super.onDestroy()
     }
 
-    override fun onBind(intent: Intent?): IBinder? = null
+    override fun onBind(
+        intent: Intent?
+    ): IBinder? = null
 
     companion object {
-        private const val NOTIFICATION_ID = 4201
+
+        private const val TAG =
+            "VisionWakeWord"
+
+        private const val NOTIFICATION_ID =
+            4201
     }
 }
