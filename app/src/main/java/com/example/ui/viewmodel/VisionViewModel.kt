@@ -28,7 +28,7 @@ class VisionViewModel(application: Application) : AndroidViewModel(application) 
 
     private val database = VisionDatabase.getDatabase(application, viewModelScope)
     private val repository = VisionRepository(database.visionDao())
-    val ttsManager = TtsManager(application)
+    val ttsManager = GeminiTtsManager(application)
 
     val sessions: StateFlow<List<ChatSession>> = repository.allSessions
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
