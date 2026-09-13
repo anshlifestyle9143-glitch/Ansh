@@ -50,8 +50,15 @@ import com.example.ui.theme.VisionTextPrimary
 import com.example.ui.theme.VisionTextSecondary
 import com.example.ui.viewmodel.VisionViewModel
 import com.example.util.LiveSpeechRecognizer
+import kotlinx.coroutines.delay
 
-private enum class VoiceCallState { IDLE, LISTENING, THINKING, SPEAKING, NO_PERMISSION }
+private enum class VoiceCallState {
+    IDLE,
+    LISTENING,
+    THINKING,
+    SPEAKING,
+    NO_PERMISSION
+}
 
 @Composable
 fun VoiceConversationScreen(
@@ -59,137 +66,365 @@ fun VoiceConversationScreen(
     onExit: () -> Unit
 ) {
     val context = LocalContext.current
+
     val isGenerating by viewModel.isGenerating.collectAsState()
     val isSpeaking by viewModel.ttsManager.isSpeaking.collectAsState()
-    var callState by remember { mutableStateOf(VoiceCallState.IDLE) }
-    var active by remember { mutableStateOf(true) }
 
-    val speechRecognizer = remember { LiveSpeechRecognizer(context) }
+    var callState by remember {
+        mutableStateOf(VoiceCallState.IDLE)
+    }
+
+    var active by remember {
+        mutableStateOf(true)
+    }
+
+    val speechRecognizer = remember {
+        LiveSpeechRecognizer(context)
+    }
 
     DisposableEffect(Unit) {
-        onDispose { speechRecognizer.destroy() }
+        onDispose {
+            active = false
+            speechRecognizer.destroy()
+        }
     }
 
     fun startListening() {
+
+        if (!active) return
+
         speechRecognizer.start(
-            onPartial = {},
+
+            onPartial = {
+                // Partial speech intentionally not displayed.
+            },
+
             onFinal = { text ->
-                callState = VoiceCallState.THINKING
-                viewModel.sendMessage(overridePrompt = text, autoSpeak = true)
+
+                if (!active) return@start
+
+                if (text.isNotBlank()) {
+
+                    callState =
+                        VoiceCallState.THINKING
+
+                    viewModel.sendMessage(
+                        overridePrompt = text,
+                        autoSpeak = true
+                    )
+                }
             },
+
             onListeningChange = { listening ->
-                if (listening) callState = VoiceCallState.LISTENING
+
+                if (!active) return@start
+
+                callState =
+                    if (listening) {
+                        VoiceCallState.LISTENING
+                    } else {
+                        VoiceCallState.THINKING
+                    }
             },
+
             onError = {
-                if (active) callState = VoiceCallState.IDLE
+
+                if (!active) return@start
+
+                callState =
+                    VoiceCallState.IDLE
             }
         )
     }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) startListening() else callState = VoiceCallState.NO_PERMISSION
-    }
+    val permissionLauncher =
+        rememberLauncherForActivityResult(
+            contract =
+                ActivityResultContracts.RequestPermission()
+        ) { granted ->
+
+            if (granted) {
+
+                startListening()
+
+            } else {
+
+                callState =
+                    VoiceCallState.NO_PERMISSION
+            }
+        }
 
     fun requestListening() {
-        val hasPermission = ContextCompat.checkSelfPermission(
-            context, Manifest.permission.RECORD_AUDIO
-        ) == PackageManager.PERMISSION_GRANTED
+
+        if (!active) return
+
+        val hasPermission =
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED
 
         if (hasPermission) {
+
             startListening()
+
         } else {
-            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+
+            permissionLauncher.launch(
+                Manifest.permission.RECORD_AUDIO
+            )
         }
     }
 
+    /*
+     * IMPORTANT:
+     *
+     * WakeWordService also uses the microphone.
+     * Give it a short moment to completely release
+     * the microphone before SpeechRecognizer starts.
+     */
     LaunchedEffect(Unit) {
-        requestListening()
-    }
 
-    LaunchedEffect(isGenerating) {
-        if (isGenerating) callState = VoiceCallState.THINKING
-    }
+        delay(600L)
 
-    LaunchedEffect(isSpeaking) {
-        if (isSpeaking) {
-            callState = VoiceCallState.SPEAKING
-        } else if (callState == VoiceCallState.SPEAKING && active) {
+        if (active) {
             requestListening()
         }
     }
 
-    val infiniteTransition = rememberInfiniteTransition(label = "voiceOrb")
-    val pulse by infiniteTransition.animateFloat(
-        initialValue = 0.92f,
-        targetValue = 1.1f,
-        animationSpec = infiniteRepeatable(animation = tween(1200), repeatMode = RepeatMode.Reverse),
-        label = "pulse"
-    )
+    /*
+     * AI is processing the command.
+     */
+    LaunchedEffect(isGenerating) {
 
-    val orbColor = when (callState) {
-        VoiceCallState.LISTENING -> VisionDeepPlum
-        VoiceCallState.THINKING -> VisionEmerald
-        VoiceCallState.SPEAKING -> VisionIndigo
-        VoiceCallState.IDLE, VoiceCallState.NO_PERMISSION -> VisionDeepPlum.copy(alpha = 0.5f)
+        if (!active) return@LaunchedEffect
+
+        if (isGenerating) {
+
+            callState =
+                VoiceCallState.THINKING
+        }
     }
 
+    /*
+     * When Vision starts speaking,
+     * stop listening state.
+     *
+     * When TTS finishes, automatically
+     * start listening again.
+     */
+    LaunchedEffect(isSpeaking) {
+
+        if (!active) return@LaunchedEffect
+
+        if (isSpeaking) {
+
+            callState =
+                VoiceCallState.SPEAKING
+
+            speechRecognizer.stop()
+
+        } else if (
+            callState == VoiceCallState.SPEAKING
+        ) {
+
+            delay(300L)
+
+            if (active) {
+                requestListening()
+            }
+        }
+    }
+
+    val infiniteTransition =
+        rememberInfiniteTransition(
+            label = "voiceOrb"
+        )
+
+    val pulse by
+        infiniteTransition.animateFloat(
+            initialValue = 0.92f,
+            targetValue = 1.1f,
+            animationSpec =
+                infiniteRepeatable(
+                    animation =
+                        tween(1200),
+                    repeatMode =
+                        RepeatMode.Reverse
+                ),
+            label = "pulse"
+        )
+
+    val orbColor =
+        when (callState) {
+
+            VoiceCallState.LISTENING ->
+                VisionDeepPlum
+
+            VoiceCallState.THINKING ->
+                VisionEmerald
+
+            VoiceCallState.SPEAKING ->
+                VisionIndigo
+
+            VoiceCallState.IDLE,
+            VoiceCallState.NO_PERMISSION ->
+                VisionDeepPlum.copy(
+                    alpha = 0.5f
+                )
+        }
+
     Box(
-        modifier = Modifier.fillMaxSize().background(VisionBackground),
-        contentAlignment = Alignment.Center
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(
+                    VisionBackground
+                ),
+        contentAlignment =
+            Alignment.Center
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+
+        Column(
+            horizontalAlignment =
+                Alignment.CenterHorizontally
+        ) {
+
             Box(
-                modifier = Modifier
-                    .size(180.dp)
-                    .graphicsLayer {
-                        val s = if (callState == VoiceCallState.IDLE || callState == VoiceCallState.NO_PERMISSION) 1f else pulse
-                        scaleX = s
-                        scaleY = s
-                    }
-                    .clip(CircleShape)
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(orbColor, orbColor.copy(alpha = 0.15f))
+                modifier =
+                    Modifier
+                        .size(180.dp)
+                        .graphicsLayer {
+
+                            val scale =
+                                if (
+                                    callState ==
+                                        VoiceCallState.IDLE ||
+                                    callState ==
+                                        VoiceCallState.NO_PERMISSION
+                                ) {
+                                    1f
+                                } else {
+                                    pulse
+                                }
+
+                            scaleX = scale
+                            scaleY = scale
+                        }
+                        .clip(CircleShape)
+                        .background(
+                            Brush.radialGradient(
+                                colors =
+                                    listOf(
+                                        orbColor,
+                                        orbColor.copy(
+                                            alpha = 0.15f
+                                        )
+                                    )
+                            )
                         )
-                    )
             )
-            Spacer(modifier = Modifier.height(28.dp))
+
+            Spacer(
+                modifier =
+                    Modifier.height(28.dp)
+            )
+
             Text(
-                text = when (callState) {
-                    VoiceCallState.LISTENING -> "Sun rahi hoon..."
-                    VoiceCallState.THINKING -> "Soch rahi hoon..."
-                    VoiceCallState.SPEAKING -> "Bol rahi hoon..."
-                    VoiceCallState.IDLE -> "Bolne ke liye mic dabao"
-                    VoiceCallState.NO_PERMISSION -> "Mic permission chahiye — settings me allow karo"
-                },
-                color = VisionTextSecondary,
-                fontSize = 14.sp
+                text =
+                    when (callState) {
+
+                        VoiceCallState.LISTENING ->
+                            "Sun rahi hoon..."
+
+                        VoiceCallState.THINKING ->
+                            "Soch rahi hoon..."
+
+                        VoiceCallState.SPEAKING ->
+                            "Bol rahi hoon..."
+
+                        VoiceCallState.IDLE ->
+                            "Bolne ke liye mic dabao"
+
+                        VoiceCallState.NO_PERMISSION ->
+                            "Mic permission chahiye — settings me allow karo"
+                    },
+
+                color =
+                    VisionTextSecondary,
+
+                fontSize =
+                    14.sp
             )
         }
 
+        /*
+         * Close voice conversation.
+         */
         IconButton(
             onClick = {
+
                 active = false
+
+                speechRecognizer.stop()
+
                 onExit()
             },
-            modifier = Modifier.align(Alignment.TopStart).padding(20.dp)
+
+            modifier =
+                Modifier
+                    .align(
+                        Alignment.TopStart
+                    )
+                    .padding(20.dp)
         ) {
-            Icon(Icons.Default.Close, contentDescription = "End call", tint = VisionTextPrimary)
+
+            Icon(
+                Icons.Default.Close,
+                contentDescription =
+                    "End call",
+                tint =
+                    VisionTextPrimary
+            )
         }
 
-        if (callState == VoiceCallState.IDLE || callState == VoiceCallState.NO_PERMISSION) {
+        /*
+         * Manual microphone button.
+         */
+        if (
+            callState ==
+                VoiceCallState.IDLE ||
+            callState ==
+                VoiceCallState.NO_PERMISSION
+        ) {
+
             IconButton(
-                onClick = { requestListening() },
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 56.dp)
-                    .size(64.dp)
-                    .clip(CircleShape)
-                    .background(VisionDeepPlum)
+                onClick = {
+                    requestListening()
+                },
+
+                modifier =
+                    Modifier
+                        .align(
+                            Alignment.BottomCenter
+                        )
+                        .padding(
+                            bottom = 56.dp
+                        )
+                        .size(64.dp)
+                        .clip(CircleShape)
+                        .background(
+                            VisionDeepPlum
+                        )
             ) {
-                Icon(Icons.Default.Mic, contentDescription = "Speak", tint = Color.White)
+
+                Icon(
+                    Icons.Default.Mic,
+                    contentDescription =
+                        "Speak",
+                    tint =
+                        Color.White
+                )
             }
         }
     }
