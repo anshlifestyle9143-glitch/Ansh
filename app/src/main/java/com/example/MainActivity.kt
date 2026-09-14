@@ -70,6 +70,16 @@ class MainActivity : ComponentActivity() {
 
         handleIntent(intent)
     }
+    
+    private fun openOverlayPermissionSettings() {
+    if (!Settings.canDrawOverlays(this)) {
+        val intent = Intent(
+            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+            Uri.parse("package:$packageName")
+        )
+        startActivity(intent)
+    }
+    }
 
     private fun handleIntent(intent: Intent?) {
 
