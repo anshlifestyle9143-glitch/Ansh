@@ -402,7 +402,7 @@ fun VoiceConversationScreen(
                             /*
                              * Listen again.
                              */
-                            requestListening()
+                            startListening()
                         }
                     }
                 }
