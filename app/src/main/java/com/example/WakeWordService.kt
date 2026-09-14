@@ -4,12 +4,20 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.Context
 import android.content.Intent
+import android.graphics.PixelFormat
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.os.PowerManager
+import android.provider.Settings
 import android.util.Log
+import android.view.Gravity
+import android.view.View
+import android.view.WindowManager
+import android.widget.FrameLayout
 import androidx.core.app.NotificationCompat
-import com.example.MainActivity
 import com.rementia.openwakeword.lib.WakeWordEngine
 import com.rementia.openwakeword.lib.model.DetectionMode
 import com.rementia.openwakeword.lib.model.WakeWordModel
@@ -29,8 +37,14 @@ class WakeWordService : Service() {
             Dispatchers.Default + SupervisorJob()
         )
 
+    private val mainHandler =
+        Handler(Looper.getMainLooper())
+
     private var wakeWordEngine: WakeWordEngine? = null
     private var detectionJob: Job? = null
+
+    private var overlayView: View? = null
+    private var overlayWindowManager: WindowManager? = null
 
     @Volatile
     private var running = false
@@ -127,20 +141,14 @@ class WakeWordService : Service() {
                             )
 
                             /*
-                             * Immediately stop accepting new
-                             * wake-word detections.
+                             * Stop accepting another wake word
+                             * while Vision is responding.
                              */
                             running = false
 
                             /*
-                             * IMPORTANT:
-                             *
-                             * Completely release the wake-word
-                             * audio engine before starting the
-                             * Android SpeechRecognizer.
-                             *
-                             * This prevents both recognizers from
-                             * competing for RECORD_AUDIO.
+                             * Release microphone completely
+                             * before showing the overlay.
                              */
                             try {
 
@@ -171,14 +179,14 @@ class WakeWordService : Service() {
                             wakeWordEngine = null
 
                             /*
-                             * Give Android a short amount of time
-                             * to release the audio input path.
+                             * Give Android time to release
+                             * the microphone.
                              */
                             delay(
                                 MICROPHONE_HANDOFF_DELAY_MS
                             )
 
-                            launchVoiceCall()
+                            showVisionOverlay()
                         }
                     }
 
@@ -219,6 +227,158 @@ class WakeWordService : Service() {
             }
     }
 
+    private fun showVisionOverlay() {
+
+        mainHandler.post {
+
+            try {
+
+                /*
+                 * Android requires the user to grant
+                 * "Display over other apps" permission.
+                 */
+                if (!Settings.canDrawOverlays(this)) {
+
+                    Log.w(
+                        TAG,
+                        "Overlay permission is not granted"
+                    )
+
+                    scheduleRestart()
+                    return@post
+                }
+
+                /*
+                 * Avoid duplicate overlay instances.
+                 */
+                removeVisionOverlay()
+
+                val windowManager =
+                    getSystemService(
+                        Context.WINDOW_SERVICE
+                    ) as WindowManager
+
+                val container =
+                    FrameLayout(this)
+
+                val hologram =
+                    VisionOverlayView(this)
+
+                container.addView(
+                    hologram,
+                    FrameLayout.LayoutParams(
+                        dp(330),
+                        dp(330),
+                        Gravity.CENTER
+                    )
+                )
+
+                val params =
+                    WindowManager.LayoutParams(
+                        dp(330),
+                        dp(330),
+
+                        WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+
+                        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+
+                        PixelFormat.TRANSLUCENT
+                    ).apply {
+
+                        gravity =
+                            Gravity.BOTTOM or
+                                Gravity.CENTER_HORIZONTAL
+
+                        y =
+                            dp(12)
+
+                        x = 0
+
+                        alpha = 1.0f
+                    }
+
+                windowManager.addView(
+                    container,
+                    params
+                )
+
+                overlayWindowManager =
+                    windowManager
+
+                overlayView =
+                    container
+
+                wakeScreenIfNeeded()
+
+                Log.d(
+                    TAG,
+                    "Vision hologram overlay shown"
+                )
+
+                /*
+                 * Step 5 test:
+                 * keep the hologram visible for 5 seconds,
+                 * then return to passive wake-word listening.
+                 */
+                mainHandler.postDelayed(
+                    {
+                        removeVisionOverlay()
+                        scheduleRestart()
+                    },
+                    OVERLAY_DURATION_MS
+                )
+
+            } catch (e: Exception) {
+
+                Log.e(
+                    TAG,
+                    "Unable to show Vision overlay",
+                    e
+                )
+
+                removeVisionOverlay()
+                scheduleRestart()
+            }
+        }
+    }
+
+    private fun removeVisionOverlay() {
+
+        mainHandler.post {
+
+            val view =
+                overlayView
+
+            val manager =
+                overlayWindowManager
+
+            if (
+                view != null &&
+                manager != null
+            ) {
+
+                try {
+
+                    manager.removeView(
+                        view
+                    )
+
+                } catch (e: Exception) {
+
+                    Log.w(
+                        TAG,
+                        "Overlay remove warning",
+                        e
+                    )
+                }
+            }
+
+            overlayView = null
+            overlayWindowManager = null
+        }
+    }
+
     private fun scheduleRestart() {
 
         if (restarting) return
@@ -250,56 +410,6 @@ class WakeWordService : Service() {
 
                 startWakeWordDetection()
             }
-        }
-    }
-
-    private fun launchVoiceCall() {
-
-        try {
-
-            /*
-             * Request the screen to wake before opening Vision.
-             */
-            wakeScreenIfNeeded()
-
-            val intent =
-                Intent(
-                    this,
-                    MainActivity::class.java
-                ).apply {
-
-                    addFlags(
-                        Intent.FLAG_ACTIVITY_NEW_TASK or
-                            Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                            Intent.FLAG_ACTIVITY_SINGLE_TOP
-                    )
-
-                    putExtra(
-                        MainActivity.EXTRA_OPEN_VOICE_CALL,
-                        true
-                    )
-                }
-
-            startActivity(intent)
-
-            Log.d(
-                TAG,
-                "Voice activity launch requested"
-            )
-
-        } catch (e: Exception) {
-
-            Log.e(
-                TAG,
-                "Unable to launch voice screen",
-                e
-            )
-
-            /*
-             * If Activity launch fails, restart wake-word
-             * detection so Vision does not remain silent.
-             */
-            scheduleRestart()
         }
     }
 
@@ -383,6 +493,14 @@ class WakeWordService : Service() {
             .build()
     }
 
+    private fun dp(value: Int): Int {
+
+        return (
+            value *
+                resources.displayMetrics.density
+            ).toInt()
+    }
+
     override fun onDestroy() {
 
         running = false
@@ -390,6 +508,12 @@ class WakeWordService : Service() {
 
         detectionJob?.cancel()
         detectionJob = null
+
+        mainHandler.removeCallbacksAndMessages(
+            null
+        )
+
+        removeVisionOverlay()
 
         try {
             wakeWordEngine?.stop()
@@ -422,10 +546,6 @@ class WakeWordService : Service() {
         private const val NOTIFICATION_ID =
             9143
 
-        /*
-         * Delay between releasing the wake-word microphone
-         * and starting the voice conversation.
-         */
         private const val MICROPHONE_HANDOFF_DELAY_MS =
             500L
 
@@ -434,5 +554,8 @@ class WakeWordService : Service() {
 
         private const val SCREEN_WAKE_DURATION_MS =
             3000L
+
+        private const val OVERLAY_DURATION_MS =
+            5000L
     }
 }
