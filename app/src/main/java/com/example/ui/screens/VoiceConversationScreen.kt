@@ -240,7 +240,7 @@ fun VoiceConversationScreen(
         -System.currentTimeMillis()
     )
 
-    delay(600L)
+    delay(150L)
 
     if (active) {
         requestListening()
