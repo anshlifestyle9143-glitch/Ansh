@@ -25,15 +25,20 @@ import kotlinx.coroutines.withTimeoutOrNull
  *      ↓
  * Yes Boss
  *      ↓
- * Microphone ON
- *      ↓
  * User speech
  *      ↓
- * Final speech text
+ * Semantic AI intent classification
  *      ↓
- * Intent / AI layer
+ * ┌──────────────┬──────────────┬──────────────┐
+ * │ ACTION       │ CONVERSATION  │ QUESTION     │
+ * │              │               │ SEARCH       │
+ * ↓              ↓               ↓
+ * Ok Boss        Natural reply   Information
+ * ↓
+ * Executor
  *
- * This controller does NOT use fixed command keywords.
+ * No fixed sentence matching.
+ * No keyword-based command detection.
  */
 class VisionVoiceController(
     private val context: Context,
@@ -41,13 +46,9 @@ class VisionVoiceController(
 ) {
 
     companion object {
-        private const val TAG = "VisionVoiceController"
+        private const val TAG =
+            "VisionVoiceController"
 
-        /*
-         * If speech recognition fails without producing
-         * a final result, retry once instead of immediately
-         * killing the complete voice session.
-         */
         private const val MAX_RECOGNITION_RETRIES = 2
     }
 
@@ -57,9 +58,14 @@ class VisionVoiceController(
                 SupervisorJob()
         )
 
-    private var recognizer: LiveSpeechRecognizer? = null
+    private val intentClassifier =
+        VisionIntentClassifier()
 
-    private var listeningJob: Job? = null
+    private var recognizer:
+        LiveSpeechRecognizer? = null
+
+    private var listeningJob:
+        Job? = null
 
     @Volatile
     private var active = false
@@ -69,9 +75,6 @@ class VisionVoiceController(
 
     private var recognitionRetryCount = 0
 
-    /**
-     * Starts the wake-word voice interaction.
-     */
     fun start(
         onListening: () -> Unit = {},
         onThinking: () -> Unit = {},
@@ -82,7 +85,10 @@ class VisionVoiceController(
     ) {
 
         if (active) {
-            Log.d(TAG, "start(): already active")
+            Log.d(
+                TAG,
+                "start(): already active"
+            )
             return
         }
 
@@ -90,61 +96,43 @@ class VisionVoiceController(
         processing = false
         recognitionRetryCount = 0
 
-        recognizer = LiveSpeechRecognizer(context)
+        recognizer =
+            LiveSpeechRecognizer(context)
 
-        listeningJob = scope.launch {
+        listeningJob =
+            scope.launch {
 
-            /*
-             * ---------------------------------------------
-             * 1. WAKE WORD RESPONSE
-             * ---------------------------------------------
-             */
+                Log.d(
+                    TAG,
+                    "Speaking: Yes Boss"
+                )
 
-            Log.d(TAG, "Speaking: Yes Boss")
+                speakAndWait(
+                    text = "Yes Boss",
+                    onSpeaking = onSpeaking
+                )
 
-            speakAndWait(
-                text = "Yes Boss",
-                onSpeaking = onSpeaking
-            )
+                if (!active) {
+                    return@launch
+                }
 
-            if (!active) {
-                return@launch
+                delay(700L)
+
+                if (!active) {
+                    return@launch
+                }
+
+                listenForInput(
+                    onListening = onListening,
+                    onThinking = onThinking,
+                    onSpeaking = onSpeaking,
+                    onConversation = onConversation,
+                    onCommand = onCommand,
+                    onDismiss = onDismiss
+                )
             }
-
-            /*
-             * Give the audio system a moment to release
-             * the TTS audio path before opening recognition.
-             */
-            delay(700L)
-
-            if (!active) {
-                return@launch
-            }
-
-            /*
-             * ---------------------------------------------
-             * 2. START USER LISTENING
-             * ---------------------------------------------
-             */
-
-            Log.d(TAG, "Starting user speech recognition")
-
-            listenForInput(
-                onListening = onListening,
-                onThinking = onThinking,
-                onSpeaking = onSpeaking,
-                onConversation = onConversation,
-                onCommand = onCommand,
-                onDismiss = onDismiss
-            )
-        }
     }
 
-    /**
-     * Starts speech recognition for the user command.
-     *
-     * No hard-coded command matching happens here.
-     */
     private fun listenForInput(
         onListening: () -> Unit,
         onThinking: () -> Unit,
@@ -165,7 +153,10 @@ class VisionVoiceController(
             ) != PackageManager.PERMISSION_GRANTED
         ) {
 
-            Log.e(TAG, "RECORD_AUDIO permission missing")
+            Log.e(
+                TAG,
+                "RECORD_AUDIO permission missing"
+            )
 
             stop()
             onDismiss()
@@ -184,12 +175,6 @@ class VisionVoiceController(
 
         speech.start(
 
-            /*
-             * ---------------------------------------------
-             * PARTIAL RESULTS
-             * ---------------------------------------------
-             */
-
             onPartial = { text ->
 
                 if (!active) {
@@ -200,18 +185,7 @@ class VisionVoiceController(
                     TAG,
                     "Partial speech: $text"
                 )
-
-                /*
-                 * We intentionally do not classify
-                 * partial speech.
-                 */
             },
-
-            /*
-             * ---------------------------------------------
-             * FINAL RESULT
-             * ---------------------------------------------
-             */
 
             onFinal = { text ->
 
@@ -234,7 +208,7 @@ class VisionVoiceController(
 
                     Log.d(
                         TAG,
-                        "Final result was empty"
+                        "Empty final speech"
                     )
 
                     stop()
@@ -243,29 +217,15 @@ class VisionVoiceController(
                     return@start
                 }
 
-                /*
-                 * -----------------------------------------
-                 * INTENT / AI GATEWAY
-                 * -----------------------------------------
-                 *
-                 * No keyword matching.
-                 *
-                 * The complete natural-language sentence
-                 * is passed to the intelligence layer.
-                 */
-
                 classifyIntent(
                     text = cleanText,
                     onConversation = onConversation,
-                    onCommand = onCommand
+                    onCommand = onCommand,
+                    onThinking = onThinking,
+                    onSpeaking = onSpeaking,
+                    onDismiss = onDismiss
                 )
             },
-
-            /*
-             * ---------------------------------------------
-             * LISTENING STATE
-             * ---------------------------------------------
-             */
 
             onListeningChange = { listening ->
 
@@ -286,25 +246,10 @@ class VisionVoiceController(
 
                     Log.d(
                         TAG,
-                        "Speech recognition temporarily ended"
+                        "Recognition phase ended"
                     )
-
-                    /*
-                     * IMPORTANT:
-                     *
-                     * Do NOT stop the complete controller here.
-                     *
-                     * LiveSpeechRecognizer may briefly report
-                     * listening=false between speech phases.
-                     */
                 }
             },
-
-            /*
-             * ---------------------------------------------
-             * RECOGNITION ERROR
-             * ---------------------------------------------
-             */
 
             onError = {
 
@@ -319,12 +264,6 @@ class VisionVoiceController(
                     "Speech recognition error"
                 )
 
-                /*
-                 * Do not immediately destroy the complete
-                 * wake-word conversation.
-                 *
-                 * Retry recognition a limited number of times.
-                 */
                 if (
                     recognitionRetryCount <
                     MAX_RECOGNITION_RETRIES
@@ -334,8 +273,8 @@ class VisionVoiceController(
 
                     Log.d(
                         TAG,
-                        "Retrying speech recognition: " +
-                            "$recognitionRetryCount"
+                        "Retrying recognition: " +
+                            recognitionRetryCount
                     )
 
                     scope.launch {
@@ -360,57 +299,172 @@ class VisionVoiceController(
 
                     Log.w(
                         TAG,
-                        "Speech recognition retries exhausted"
+                        "Recognition retries exhausted"
                     )
 
                     stop()
                     onDismiss()
                 }
-            }
+            },
+
+            /*
+             * IMPORTANT:
+             *
+             * Manual voice page remains continuous.
+             * Overlay keeps its normal timeout because it
+             * does not pass this flag.
+             */
+            continuous = true
         )
     }
 
     /**
-     * Temporary natural-language gateway.
+     * Semantic AI gateway.
      *
-     * This intentionally does NOT inspect individual
-     * keywords such as "flashlight", "light", etc.
+     * There is deliberately NO:
      *
-     * The actual semantic intent engine will be connected
-     * here after the microphone pipeline is confirmed stable.
+     * text.contains("flashlight")
+     * text.contains("light")
+     * text.contains("call")
+     *
+     * etc.
+     *
+     * The AI determines what the user means.
      */
     private fun classifyIntent(
         text: String,
         onConversation: (String) -> Unit,
-        onCommand: (String) -> Unit
+        onCommand: (String) -> Unit,
+        onThinking: () -> Unit,
+        onSpeaking: () -> Unit,
+        onDismiss: () -> Unit
     ) {
 
-        Log.d(
-            TAG,
-            "Passing natural-language input to AI layer: [$text]"
-        )
+        scope.launch {
 
-        /*
-         * For now everything goes to the conversation
-         * gateway.
-         *
-         * This will later become:
-         *
-         * ACTION       -> onCommand()
-         * CONVERSATION -> onConversation()
-         * QUESTION     -> AI/search
-         * UNCLEAR      -> clarification
-         *
-         * without hard-coded sentence matching.
-         */
+            if (!active) {
+                return@launch
+            }
 
-        onConversation(text)
+            onThinking()
+
+            val result =
+                intentClassifier.classify(text)
+
+            if (!active) {
+                return@launch
+            }
+
+            Log.d(
+                TAG,
+                "Intent result: ${result.type}"
+            )
+
+            when (result.type) {
+
+                VisionIntentClassifier.IntentType.ACTION -> {
+
+                    /*
+                     * ACTION:
+                     *
+                     * Only now say Ok Boss.
+                     *
+                     * Normal conversation never reaches here.
+                     */
+                    speakAndWait(
+                        text = "Ok Boss",
+                        onSpeaking = onSpeaking
+                    )
+
+                    if (!active) {
+                        return@launch
+                    }
+
+                    onCommand(
+                        result.originalText
+                    )
+                }
+
+                VisionIntentClassifier.IntentType.CONVERSATION -> {
+
+                    /*
+                     * Normal conversation.
+                     *
+                     * NO "Ok Boss".
+                     */
+                    onConversation(
+                        result.originalText
+                    )
+                }
+
+                VisionIntentClassifier.IntentType.QUESTION -> {
+
+                    /*
+                     * Questions are not device actions.
+                     *
+                     * NO "Ok Boss".
+                     */
+                    onConversation(
+                        result.originalText
+                    )
+                }
+
+                VisionIntentClassifier.IntentType.SEARCH -> {
+
+                    /*
+                     * Search requests are also not treated
+                     * as generic device actions.
+                     *
+                     * NO forced "Ok Boss" here.
+                     */
+                    onConversation(
+                        result.originalText
+                    )
+                }
+
+                VisionIntentClassifier.IntentType.UNCLEAR -> {
+
+                    /*
+                     * Never execute something when intent
+                     * is uncertain.
+                     */
+                    speakAndWait(
+                        text =
+                            "Boss, mujhe samajh nahi aaya. Dobara boliye.",
+                        onSpeaking = onSpeaking
+                    )
+
+                    if (!active) {
+                        return@launch
+                    }
+
+                    /*
+                     * Return to listening rather than
+                     * destroying the complete voice session.
+                     */
+                    delay(300L)
+
+                    listenForInput(
+                        onListening = onListeningCallback,
+                        onThinking = onThinking,
+                        onSpeaking = onSpeaking,
+                        onConversation = onConversation,
+                        onCommand = onCommand,
+                        onDismiss = onDismiss
+                    )
+                }
+            }
+        }
     }
 
-    /**
-     * Speaks a short system response and waits for TTS
-     * completion before opening the microphone.
+    /*
+     * These callbacks are temporarily stored so the
+     * semantic layer can return to listening after
+     * an unclear request.
      */
+    private var onListeningCallback:
+        () -> Unit = {}
+
     private suspend fun speakAndWait(
         text: String,
         onSpeaking: () -> Unit
@@ -432,12 +486,6 @@ class VisionVoiceController(
             -System.currentTimeMillis()
         )
 
-        /*
-         * Wait until TTS actually enters speaking state.
-         *
-         * If it doesn't, continue after timeout instead
-         * of getting stuck forever.
-         */
         val started =
             withTimeoutOrNull(3000L) {
 
@@ -451,20 +499,11 @@ class VisionVoiceController(
 
         if (started) {
 
-            Log.d(
-                TAG,
-                "TTS speaking"
-            )
-
-            /*
-             * Wait for TTS completion.
-             */
             withTimeoutOrNull(10000L) {
 
                 ttsManager
                     .isSpeaking
                     .first { !it }
-
             }
 
             Log.d(
@@ -476,20 +515,17 @@ class VisionVoiceController(
 
             Log.w(
                 TAG,
-                "TTS speaking state was not detected"
+                "TTS speaking state not detected"
             )
         }
     }
 
-    /**
-     * Stops current voice interaction.
-     *
-     * Wake-word service itself can restart passive
-     * listening after the overlay session finishes.
-     */
     fun stop() {
 
-        Log.d(TAG, "Stopping voice controller")
+        Log.d(
+            TAG,
+            "Stopping voice controller"
+        )
 
         active = false
         processing = false
@@ -511,12 +547,12 @@ class VisionVoiceController(
         recognizer = null
     }
 
-    /**
-     * Completely releases controller resources.
-     */
     fun destroy() {
 
-        Log.d(TAG, "Destroying voice controller")
+        Log.d(
+            TAG,
+            "Destroying voice controller"
+        )
 
         stop()
 
