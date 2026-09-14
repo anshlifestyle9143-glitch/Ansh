@@ -237,42 +237,23 @@ class WakeWordService : Service() {
     }
 
     private fun wakeScreenIfNeeded() {
+    try {
+        val powerManager = getSystemService(POWER_SERVICE) as PowerManager
 
-        try {
-
-            val powerManager =
-                getSystemService(
-                    POWER_SERVICE
-                ) as PowerManager
-
-            if (!powerManager.isInteractive) {
-
-                @Suppress("DEPRECATION")
-                val wakeLock =
-                    powerManager.newWakeLock(
-                        PowerManager.SCREEN_BRIGHT_WAKE_LOCK or
-                                PowerManager.ACQUIRE_CAUSES_WAKEUP,
-                        "$TAG:WakeLock"
-                    )
-
-                wakeLock.acquire(
-                    SCREEN_WAKE_DURATION_MS
-                )
-
-                Log.d(
-                    TAG,
-                    "Screen wake requested"
-                )
-            }
-
-        } catch (e: Exception) {
-
-            Log.w(
-                TAG,
-                "Unable to wake screen",
-                e
+        if (!powerManager.isInteractive) {
+            @Suppress("DEPRECATION")
+            val wakeLock = powerManager.newWakeLock(
+                PowerManager.SCREEN_BRIGHT_WAKE_LOCK or
+                    PowerManager.ACQUIRE_CAUSES_WAKEUP,
+                "Vision::WakeWordScreen"
             )
+
+            wakeLock.acquire(SCREEN_WAKE_DURATION_MS)
+            Log.d(TAG, "Screen wake requested")
         }
+    } catch (e: Exception) {
+        Log.e(TAG, "Unable to wake screen", e)
+    }
     }
 
     private fun buildNotification(): Notification {
