@@ -34,7 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -67,8 +67,11 @@ fun VoiceConversationScreen(
 ) {
     val context = LocalContext.current
 
-    val isGenerating by viewModel.isGenerating.collectAsState()
-    val isSpeaking by viewModel.ttsManager.isSpeaking.collectAsState()
+    val isGenerating by
+        viewModel.isGenerating.collectAsState()
+
+    val isSpeaking by
+        viewModel.ttsManager.isSpeaking.collectAsState()
 
     var callState by remember {
         mutableStateOf(VoiceCallState.IDLE)
@@ -78,30 +81,67 @@ fun VoiceConversationScreen(
         mutableStateOf(true)
     }
 
+    /*
+     * Prevent multiple SpeechRecognizer sessions
+     * from being started at the same time.
+     */
+    var listeningStarted by remember {
+        mutableStateOf(false)
+    }
+
     val speechRecognizer = remember {
         LiveSpeechRecognizer(context)
     }
 
+    /*
+     * Clean everything when the voice screen disappears.
+     */
     DisposableEffect(Unit) {
+
         onDispose {
+
             active = false
+            listeningStarted = false
+
+            speechRecognizer.stop()
             speechRecognizer.destroy()
         }
     }
 
+    /*
+     * Start one speech-recognition session.
+     */
     fun startListening() {
 
         if (!active) return
 
+        /*
+         * Never start another recognizer while one
+         * is already active.
+         */
+        if (listeningStarted) return
+
+        /*
+         * Never listen while Vision is generating
+         * or speaking.
+         */
+        if (isGenerating || isSpeaking) return
+
+        listeningStarted = true
+
         speechRecognizer.start(
 
             onPartial = {
-                // Partial speech intentionally not displayed.
+                /*
+                 * Partial speech intentionally not displayed.
+                 */
             },
 
             onFinal = { text ->
 
                 if (!active) return@start
+
+                listeningStarted = false
 
                 if (text.isNotBlank()) {
 
@@ -112,6 +152,10 @@ fun VoiceConversationScreen(
                         overridePrompt = text,
                         autoSpeak = true
                     )
+                } else {
+
+                    callState =
+                        VoiceCallState.IDLE
                 }
             },
 
@@ -119,17 +163,38 @@ fun VoiceConversationScreen(
 
                 if (!active) return@start
 
-                callState =
-                    if (listening) {
+                if (listening) {
+
+                    listeningStarted = true
+
+                    callState =
                         VoiceCallState.LISTENING
-                    } else {
-                        VoiceCallState.THINKING
+
+                } else {
+
+                    /*
+                     * Do not immediately restart here.
+                     *
+                     * LiveSpeechRecognizer now stops after a
+                     * final result. The AI/TTS flow decides
+                     * when listening should resume.
+                     */
+                    if (
+                        callState ==
+                            VoiceCallState.LISTENING
+                    ) {
+
+                        callState =
+                            VoiceCallState.THINKING
                     }
+                }
             },
 
             onError = {
 
                 if (!active) return@start
+
+                listeningStarted = false
 
                 callState =
                     VoiceCallState.IDLE
@@ -137,11 +202,16 @@ fun VoiceConversationScreen(
         )
     }
 
+    /*
+     * Microphone permission.
+     */
     val permissionLauncher =
         rememberLauncherForActivityResult(
             contract =
                 ActivityResultContracts.RequestPermission()
         ) { granted ->
+
+            if (!active) return@rememberLauncherForActivityResult
 
             if (granted) {
 
@@ -149,14 +219,21 @@ fun VoiceConversationScreen(
 
             } else {
 
+                listeningStarted = false
+
                 callState =
                     VoiceCallState.NO_PERMISSION
             }
         }
 
+    /*
+     * Request microphone listening.
+     */
     fun requestListening() {
 
         if (!active) return
+
+        if (isGenerating || isSpeaking) return
 
         val hasPermission =
             ContextCompat.checkSelfPermission(
@@ -177,11 +254,11 @@ fun VoiceConversationScreen(
     }
 
     /*
-     * IMPORTANT:
+     * Initial voice activation.
      *
-     * WakeWordService also uses the microphone.
-     * Give it a short moment to completely release
-     * the microphone before SpeechRecognizer starts.
+     * The wake-word engine has just released the microphone,
+     * so give Android a short moment before SpeechRecognizer
+     * takes control.
      */
     LaunchedEffect(Unit) {
 
@@ -193,7 +270,7 @@ fun VoiceConversationScreen(
     }
 
     /*
-     * AI is processing the command.
+     * AI generation state.
      */
     LaunchedEffect(isGenerating) {
 
@@ -201,17 +278,23 @@ fun VoiceConversationScreen(
 
         if (isGenerating) {
 
+            listeningStarted = false
+
             callState =
                 VoiceCallState.THINKING
+
+            speechRecognizer.stop()
         }
     }
 
     /*
-     * When Vision starts speaking,
-     * stop listening state.
+     * TTS lifecycle.
      *
-     * When TTS finishes, automatically
-     * start listening again.
+     * Speaking:
+     *      microphone OFF
+     *
+     * Finished:
+     *      microphone ON again
      */
     LaunchedEffect(isSpeaking) {
 
@@ -219,23 +302,69 @@ fun VoiceConversationScreen(
 
         if (isSpeaking) {
 
+            listeningStarted = false
+
             callState =
                 VoiceCallState.SPEAKING
 
             speechRecognizer.stop()
 
         } else if (
-            callState == VoiceCallState.SPEAKING
+            callState ==
+                VoiceCallState.SPEAKING
         ) {
 
-            delay(300L)
+            /*
+             * Small gap between TTS and microphone.
+             *
+             * This prevents the last few milliseconds of
+             * Vision's voice from being captured as a command.
+             */
+            delay(350L)
 
-            if (active) {
+            if (
+                active &&
+                !isGenerating
+            ) {
+
                 requestListening()
             }
         }
     }
 
+    /*
+     * If generation finishes without TTS starting,
+     * return to listening.
+     *
+     * This also covers cases where the TTS provider
+     * fails or returns without entering speaking state.
+     */
+    LaunchedEffect(isGenerating, isSpeaking) {
+
+        if (!active) return@LaunchedEffect
+
+        if (
+            !isGenerating &&
+            !isSpeaking &&
+            callState == VoiceCallState.THINKING
+        ) {
+
+            delay(350L)
+
+            if (
+                active &&
+                !isGenerating &&
+                !isSpeaking
+            ) {
+
+                requestListening()
+            }
+        }
+    }
+
+    /*
+     * Animated voice orb.
+     */
     val infiniteTransition =
         rememberInfiniteTransition(
             label = "voiceOrb"
@@ -303,8 +432,11 @@ fun VoiceConversationScreen(
                                     callState ==
                                         VoiceCallState.NO_PERMISSION
                                 ) {
+
                                     1f
+
                                 } else {
+
                                     pulse
                                 }
 
@@ -365,8 +497,10 @@ fun VoiceConversationScreen(
             onClick = {
 
                 active = false
+                listeningStarted = false
 
                 speechRecognizer.stop()
+                speechRecognizer.destroy()
 
                 onExit()
             },
@@ -400,6 +534,7 @@ fun VoiceConversationScreen(
 
             IconButton(
                 onClick = {
+
                     requestListening()
                 },
 
