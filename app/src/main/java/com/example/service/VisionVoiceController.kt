@@ -33,7 +33,6 @@ class VisionVoiceController(
         )
 
     private var recognizer: LiveSpeechRecognizer? = null
-
     private var listeningJob: Job? = null
 
     @Volatile
@@ -44,25 +43,13 @@ class VisionVoiceController(
 
     private var recognitionRetryCount = 0
 
-    /**
-     * Stores the latest listening callback so that
-     * Vision can return to listening after clarification.
-     */
     private var onListeningCallback: () -> Unit = {}
+    private var onThinkingCallback: () -> Unit = {}
+    private var onSpeakingCallback: () -> Unit = {}
+    private var onConversationCallback: (String) -> Unit = {}
+    private var onCommandCallback: (String) -> Unit = {}
+    private var onDismissCallback: () -> Unit = {}
 
-    /**
-     * Starts the voice interaction after wake word detection.
-     *
-     * Flow:
-     *
-     * Hey Jarvis
-     *      ↓
-     * Yes Boss
-     *      ↓
-     * Listen
-     *      ↓
-     * Semantic intent classification
-     */
     fun start(
         onListening: () -> Unit = {},
         onThinking: () -> Unit = {},
@@ -77,27 +64,20 @@ class VisionVoiceController(
             return
         }
 
-        /*
-         * IMPORTANT:
-         * Save callback immediately.
-         *
-         * This is used later if Vision needs to
-         * return to listening after clarification.
-         */
         active = true
-        onListeningCallback = onListening
         processing = false
         recognitionRetryCount = 0
+
+        onListeningCallback = onListening
+        onThinkingCallback = onThinking
+        onSpeakingCallback = onSpeaking
+        onConversationCallback = onConversation
+        onCommandCallback = onCommand
+        onDismissCallback = onDismiss
 
         recognizer = LiveSpeechRecognizer(context)
 
         listeningJob = scope.launch {
-
-            /*
-             * ---------------------------------------------
-             * WAKE WORD RESPONSE
-             * ---------------------------------------------
-             */
 
             Log.d(TAG, "Speaking: Yes Boss")
 
@@ -110,70 +90,35 @@ class VisionVoiceController(
                 return@launch
             }
 
-            /*
-             * Allow TTS/audio system to release.
-             */
             delay(700L)
 
             if (!active) {
                 return@launch
             }
 
-            /*
-             * ---------------------------------------------
-             * START LISTENING
-             * ---------------------------------------------
-             */
-
-            Log.d(
-                TAG,
-                "Starting continuous user speech recognition"
-            )
-
-            listenForInput(
-                onListening = onListening,
-                onThinking = onThinking,
-                onSpeaking = onSpeaking,
-                onConversation = onConversation,
-                onCommand = onCommand,
-                onDismiss = onDismiss
-            )
+            listenForInput()
         }
     }
 
-    /**
-     * Starts recognition for the active voice session.
-     */
-    private fun listenForInput(
-        onListening: () -> Unit,
-        onThinking: () -> Unit,
-        onSpeaking: () -> Unit,
-        onConversation: (String) -> Unit,
-        onCommand: (String) -> Unit,
-        onDismiss: () -> Unit
-    ) {
+    private fun listenForInput() {
 
         if (!active || processing) {
             return
         }
 
-        /*
-         * Check microphone permission.
-         */
         if (
             ContextCompat.checkSelfPermission(
                 context,
                 Manifest.permission.RECORD_AUDIO
             ) != PackageManager.PERMISSION_GRANTED
         ) {
-
             Log.e(
                 TAG,
                 "RECORD_AUDIO permission missing"
             )
 
             stop()
-            onDismiss()
+            onDismissCallback()
 
             return
         }
@@ -189,12 +134,6 @@ class VisionVoiceController(
 
         speech.start(
 
-            /*
-             * ---------------------------------------------
-             * PARTIAL RESULT
-             * ---------------------------------------------
-             */
-
             onPartial = { text ->
 
                 if (!active) {
@@ -205,19 +144,7 @@ class VisionVoiceController(
                     TAG,
                     "Partial speech: $text"
                 )
-
-                /*
-                 * Do NOT classify partial speech.
-                 *
-                 * Vision waits for the complete sentence.
-                 */
             },
-
-            /*
-             * ---------------------------------------------
-             * FINAL RESULT
-             * ---------------------------------------------
-             */
 
             onFinal = { text ->
 
@@ -225,8 +152,7 @@ class VisionVoiceController(
                     return@start
                 }
 
-                val cleanText =
-                    text.trim()
+                val cleanText = text.trim()
 
                 Log.d(
                     TAG,
@@ -240,41 +166,22 @@ class VisionVoiceController(
 
                     Log.d(
                         TAG,
-                        "Final result was empty"
+                        "Empty result - restarting listening"
                     )
 
-                    stop()
-                    onDismiss()
+                    scope.launch {
+                        delay(250L)
+
+                        if (active) {
+                            listenForInput()
+                        }
+                    }
 
                     return@start
                 }
 
-                /*
-                 * -----------------------------------------
-                 * SEMANTIC INTENT CLASSIFICATION
-                 * -----------------------------------------
-                 *
-                 * The complete sentence is passed to
-                 * VisionIntentClassifier.
-                 *
-                 * There is NO hard-coded command matching
-                 * here.
-                 */
-
-                classifyIntent(
-                    text = cleanText,
-                    onSpeaking = onSpeaking,
-                    onConversation = onConversation,
-                    onCommand = onCommand,
-                    onDismiss = onDismiss
-                )
+                classifyIntent(cleanText)
             },
-
-            /*
-             * ---------------------------------------------
-             * LISTENING STATE
-             * ---------------------------------------------
-             */
 
             onListeningChange = { listening ->
 
@@ -289,7 +196,7 @@ class VisionVoiceController(
                         "Microphone/listening = ON"
                     )
 
-                    onListening()
+                    onListeningCallback()
 
                 } else {
 
@@ -297,21 +204,8 @@ class VisionVoiceController(
                         TAG,
                         "Speech recognition temporarily ended"
                     )
-
-                    /*
-                     * Do NOT stop Vision here.
-                     *
-                     * The recognizer can report false between
-                     * speech phases.
-                     */
                 }
             },
-
-            /*
-             * ---------------------------------------------
-             * ERROR HANDLING
-             * ---------------------------------------------
-             */
 
             onError = {
 
@@ -343,18 +237,9 @@ class VisionVoiceController(
 
                         delay(350L)
 
-                        if (!active) {
-                            return@launch
+                        if (active) {
+                            listenForInput()
                         }
-
-                        listenForInput(
-                            onListening = onListening,
-                            onThinking = onThinking,
-                            onSpeaking = onSpeaking,
-                            onConversation = onConversation,
-                            onCommand = onCommand,
-                            onDismiss = onDismiss
-                        )
                     }
 
                 } else {
@@ -365,50 +250,15 @@ class VisionVoiceController(
                     )
 
                     stop()
-                    onDismiss()
+                    onDismissCallback()
                 }
             },
 
-            /*
-             * ---------------------------------------------
-             * CONTINUOUS MODE
-             * ---------------------------------------------
-             *
-             * This disables the short watchdog timeout
-             * inside LiveSpeechRecognizer.
-             *
-             * The active voice session is therefore controlled
-             * by VisionVoiceController rather than being
-             * automatically killed after a few seconds.
-             */
             continuous = true
         )
     }
 
-    /**
-     * Performs semantic intent classification.
-     *
-     * IMPORTANT:
-     * This does NOT inspect user text using keywords.
-     *
-     * Example:
-     *
-     * "Kaise ho?"
-     *      → CONVERSATION
-     *
-     * "Phone ki torch jala do"
-     *      → ACTION
-     *
-     * "India ki capital kya hai?"
-     *      → QUESTION
-     */
-    private fun classifyIntent(
-        text: String,
-        onSpeaking: () -> Unit,
-        onConversation: (String) -> Unit,
-        onCommand: (String) -> Unit,
-        onDismiss: () -> Unit
-    ) {
+    private fun classifyIntent(text: String) {
 
         if (!active) {
             return
@@ -423,14 +273,6 @@ class VisionVoiceController(
                     "Classifying semantic intent: [$text]"
                 )
 
-                /*
-                 * IMPORTANT:
-                 *
-                 * VisionIntentClassifier currently has
-                 * a no-argument constructor.
-                 *
-                 * DO NOT pass context here.
-                 */
                 val classifier =
                     VisionIntentClassifier()
 
@@ -448,41 +290,22 @@ class VisionVoiceController(
 
                 when (result.type) {
 
-                    /*
-                     * -------------------------------------
-                     * ACTION
-                     * -------------------------------------
-                     *
-                     * Only actual action requests receive
-                     * "Ok Boss".
-                     */
                     VisionIntentClassifier.IntentType.ACTION -> {
 
-                        onSpeaking()
+                        onThinkingCallback()
 
                         speakAndWait(
                             text = "Ok Boss",
-                            onSpeaking = onSpeaking
+                            onSpeaking = onSpeakingCallback
                         )
 
                         if (!active) {
                             return@launch
                         }
 
-                        /*
-                         * Send the ORIGINAL complete command
-                         * to the command executor.
-                         */
-                        onCommand(text)
+                        onCommandCallback(text)
                     }
 
-                    /*
-                     * -------------------------------------
-                     * CONVERSATION
-                     * -------------------------------------
-                     *
-                     * No "Ok Boss".
-                     */
                     VisionIntentClassifier.IntentType.CONVERSATION -> {
 
                         Log.d(
@@ -490,16 +313,9 @@ class VisionVoiceController(
                             "Normal conversation"
                         )
 
-                        onConversation(text)
+                        onConversationCallback(text)
                     }
 
-                    /*
-                     * -------------------------------------
-                     * QUESTION
-                     * -------------------------------------
-                     *
-                     * No "Ok Boss".
-                     */
                     VisionIntentClassifier.IntentType.QUESTION -> {
 
                         Log.d(
@@ -507,14 +323,9 @@ class VisionVoiceController(
                             "Question detected"
                         )
 
-                        onConversation(text)
+                        onConversationCallback(text)
                     }
 
-                    /*
-                     * -------------------------------------
-                     * SEARCH
-                     * -------------------------------------
-                     */
                     VisionIntentClassifier.IntentType.SEARCH -> {
 
                         Log.d(
@@ -522,17 +333,9 @@ class VisionVoiceController(
                             "Search request detected"
                         )
 
-                        onConversation(text)
+                        onConversationCallback(text)
                     }
 
-                    /*
-                     * -------------------------------------
-                     * UNCLEAR
-                     * -------------------------------------
-                     *
-                     * Ask user to clarify instead of
-                     * guessing an action.
-                     */
                     VisionIntentClassifier.IntentType.UNCLEAR -> {
 
                         Log.d(
@@ -542,7 +345,7 @@ class VisionVoiceController(
 
                         speakAndWait(
                             text = "Boss, thoda clearly bataiye.",
-                            onSpeaking = onSpeaking
+                            onSpeaking = onSpeakingCallback
                         )
 
                         if (!active) {
@@ -555,19 +358,7 @@ class VisionVoiceController(
                             return@launch
                         }
 
-                        /*
-                         * Return to listening.
-                         *
-                         * This uses the callback saved in start().
-                         */
-                        listenForInput(
-                            onListening = onListeningCallback,
-                            onThinking = {},
-                            onSpeaking = onSpeaking,
-                            onConversation = onConversation,
-                            onCommand = onCommand,
-                            onDismiss = onDismiss
-                        )
+                        listenForInput()
                     }
                 }
 
@@ -584,21 +375,16 @@ class VisionVoiceController(
                 }
 
                 /*
-                 * SAFETY:
+                 * Classification failure must never
+                 * directly execute a device action.
                  *
-                 * If classification fails, do NOT execute
-                 * a device action.
-                 *
-                 * Send it to the normal AI conversation layer.
+                 * Send it to normal AI conversation.
                  */
-                onConversation(text)
+                onConversationCallback(text)
             }
         }
     }
 
-    /**
-     * Speaks text and waits for TTS completion.
-     */
     private suspend fun speakAndWait(
         text: String,
         onSpeaking: () -> Unit
@@ -620,9 +406,6 @@ class VisionVoiceController(
             -System.currentTimeMillis()
         )
 
-        /*
-         * Wait for TTS to start.
-         */
         val started =
             withTimeoutOrNull(3000L) {
 
@@ -641,9 +424,6 @@ class VisionVoiceController(
                 "TTS speaking"
             )
 
-            /*
-             * Wait for TTS to finish.
-             */
             withTimeoutOrNull(10000L) {
 
                 ttsManager
@@ -667,8 +447,27 @@ class VisionVoiceController(
     }
 
     /**
-     * Stops the current voice interaction.
+     * Resume microphone listening after the current
+     * voice task has completed.
      */
+    fun resumeListening(delayMs: Long = 250L) {
+
+        if (!active) {
+            return
+        }
+
+        processing = false
+
+        scope.launch {
+
+            delay(delayMs)
+
+            if (active) {
+                listenForInput()
+            }
+        }
+    }
+
     fun stop() {
 
         Log.d(
@@ -679,7 +478,13 @@ class VisionVoiceController(
         active = false
         processing = false
         recognitionRetryCount = 0
+
         onListeningCallback = {}
+        onThinkingCallback = {}
+        onSpeakingCallback = {}
+        onConversationCallback = {}
+        onCommandCallback = {}
+        onDismissCallback = {}
 
         listeningJob?.cancel()
         listeningJob = null
@@ -697,9 +502,6 @@ class VisionVoiceController(
         recognizer = null
     }
 
-    /**
-     * Completely releases resources.
-     */
     fun destroy() {
 
         Log.d(
