@@ -3,6 +3,8 @@ package com.example.util
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -11,7 +13,12 @@ import java.util.Locale
 class LiveSpeechRecognizer(private val context: Context) {
 
     private var recognizer: SpeechRecognizer? = null
+    private val handler = Handler(Looper.getMainLooper())
+
     private var active = false
+    private var sessionId = 0L
+    private var lastPartialText = ""
+    private var finalDelivered = false
 
     fun start(
         onPartial: (String) -> Unit,
@@ -20,22 +27,28 @@ class LiveSpeechRecognizer(private val context: Context) {
         onError: () -> Unit
     ) {
         active = true
+        sessionId++
+        lastPartialText = ""
+        finalDelivered = false
+        cancelFinishWatchdog()
 
         startRecognition(
-            onPartial = onPartial,
-            onFinal = onFinal,
-            onListeningChange = onListeningChange,
-            onError = onError
+            sessionId,
+            onPartial,
+            onFinal,
+            onListeningChange,
+            onError
         )
     }
 
     private fun startRecognition(
+        currentSession: Long,
         onPartial: (String) -> Unit,
         onFinal: (String) -> Unit,
         onListeningChange: (Boolean) -> Unit,
         onError: () -> Unit
     ) {
-        if (!active) return
+        if (!active || currentSession != sessionId) return
 
         if (!SpeechRecognizer.isRecognitionAvailable(context)) {
             onError()
@@ -52,45 +65,80 @@ class LiveSpeechRecognizer(private val context: Context) {
             setRecognitionListener(
                 object : RecognitionListener {
 
-                    override fun onReadyForSpeech(params: Bundle?) {
-                        onListeningChange(true)
-                    }
-
-                    override fun onBeginningOfSpeech() {
-                    }
-
-                    override fun onRmsChanged(rmsdB: Float) {
-                    }
-
-                    override fun onBufferReceived(buffer: ByteArray?) {
-                    }
-
-                    override fun onEndOfSpeech() {
-                        onListeningChange(false)
-                    }
-
-                    override fun onError(error: Int) {
-                        onListeningChange(false)
-
-                        /*
-                         * IMPORTANT:
-                         * Do NOT automatically restart recognition here.
-                         *
-                         * The previous implementation restarted the
-                         * SpeechRecognizer after every error, which could
-                         * create a race between the UI state and the actual
-                         * recognizer state.
-                         *
-                         * A new recognition session will only be started
-                         * when start() is explicitly called again.
-                         */
-
-                        if (active) {
-                            onError()
+                    override fun onReadyForSpeech(
+                        params: Bundle?
+                    ) {
+                        if (
+                            active &&
+                            currentSession == sessionId
+                        ) {
+                            onListeningChange(true)
                         }
                     }
 
-                    override fun onResults(results: Bundle?) {
+                    override fun onBeginningOfSpeech() {
+                        cancelFinishWatchdog()
+                    }
+
+                    override fun onRmsChanged(
+                        rmsdB: Float
+                    ) = Unit
+
+                    override fun onBufferReceived(
+                        buffer: ByteArray?
+                    ) = Unit
+
+                    override fun onEndOfSpeech() {
+
+                        if (
+                            !active ||
+                            currentSession != sessionId ||
+                            finalDelivered
+                        ) {
+                            return
+                        }
+
+                        onListeningChange(false)
+
+                        scheduleFinishWatchdog(
+                            currentSession,
+                            onFinal,
+                            onError
+                        )
+                    }
+
+                    override fun onError(
+                        error: Int
+                    ) {
+
+                        if (
+                            !active ||
+                            currentSession != sessionId ||
+                            finalDelivered
+                        ) {
+                            return
+                        }
+
+                        cancelFinishWatchdog()
+
+                        onListeningChange(false)
+
+                        onError()
+                    }
+
+                    override fun onResults(
+                        results: Bundle?
+                    ) {
+
+                        if (
+                            !active ||
+                            currentSession != sessionId ||
+                            finalDelivered
+                        ) {
+                            return
+                        }
+
+                        cancelFinishWatchdog()
 
                         val text =
                             results
@@ -98,6 +146,17 @@ class LiveSpeechRecognizer(private val context: Context) {
                                     SpeechRecognizer.RESULTS_RECOGNITION
                                 )
                                 ?.firstOrNull()
+                                ?.trim()
+                                .orEmpty()
+
+                        val finalText =
+                            if (text.isNotBlank()) {
+                                text
+                            } else {
+                                lastPartialText.trim()
+                            }
+
+                        finalDelivered = true
 
                         onListeningChange(false)
 
@@ -106,12 +165,20 @@ class LiveSpeechRecognizer(private val context: Context) {
                         } catch (_: Exception) {
                         }
 
-                        if (!text.isNullOrBlank()) {
-                            onFinal(text)
-                        }
+                        onFinal(finalText)
                     }
 
-                    override fun onPartialResults(partialResults: Bundle?) {
+                    override fun onPartialResults(
+                        partialResults: Bundle?
+                    ) {
+
+                        if (
+                            !active ||
+                            currentSession != sessionId ||
+                            finalDelivered
+                        ) {
+                            return
+                        }
 
                         val text =
                             partialResults
@@ -119,8 +186,11 @@ class LiveSpeechRecognizer(private val context: Context) {
                                     SpeechRecognizer.RESULTS_RECOGNITION
                                 )
                                 ?.firstOrNull()
+                                ?.trim()
+                                .orEmpty()
 
-                        if (!text.isNullOrBlank()) {
+                        if (text.isNotBlank()) {
+                            lastPartialText = text
                             onPartial(text)
                         }
                     }
@@ -128,68 +198,125 @@ class LiveSpeechRecognizer(private val context: Context) {
                     override fun onEvent(
                         eventType: Int,
                         params: Bundle?
-                    ) {
-                    }
+                    ) = Unit
                 }
             )
         }
 
-        val intent = Intent(
-            RecognizerIntent.ACTION_RECOGNIZE_SPEECH
-        ).apply {
+        val intent =
+            Intent(
+                RecognizerIntent.ACTION_RECOGNIZE_SPEECH
+            ).apply {
 
-            putExtra(
-                RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
-            )
+                putExtra(
+                    RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                    RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+                )
 
-            putExtra(
-                RecognizerIntent.EXTRA_LANGUAGE,
-                Locale.getDefault()
-            )
+                putExtra(
+                    RecognizerIntent.EXTRA_LANGUAGE,
+                    Locale.getDefault()
+                )
 
-            putExtra(
-                RecognizerIntent.EXTRA_PARTIAL_RESULTS,
-                true
-            )
+                putExtra(
+                    RecognizerIntent.EXTRA_PARTIAL_RESULTS,
+                    true
+                )
 
-            putExtra(
-                RecognizerIntent.EXTRA_CALLING_PACKAGE,
-                context.packageName
-            )
+                putExtra(
+                    RecognizerIntent.EXTRA_CALLING_PACKAGE,
+                    context.packageName
+                )
 
-            /*
-             * Keep command finalization reasonably fast.
-             */
-            putExtra(
-                RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS,
-                1500L
-            )
+                putExtra(
+                    RecognizerIntent
+                        .EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS,
+                    1500L
+                )
 
-            putExtra(
-                RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS,
-                1500L
-            )
+                putExtra(
+                    RecognizerIntent
+                        .EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS,
+                    1500L
+                )
 
-            putExtra(
-                RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS,
-                1500L
-            )
-        }
+                putExtra(
+                    RecognizerIntent
+                        .EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS,
+                    1500L
+                )
+            }
 
         try {
-            recognizer?.startListening(intent)
-        } catch (_: Exception) {
-            onListeningChange(false)
 
-            if (active) {
+            recognizer?.startListening(intent)
+
+        } catch (_: Exception) {
+
+            if (
+                active &&
+                currentSession == sessionId
+            ) {
+
+                onListeningChange(false)
                 onError()
             }
         }
     }
 
+    private fun scheduleFinishWatchdog(
+        currentSession: Long,
+        onFinal: (String) -> Unit,
+        onError: () -> Unit
+    ) {
+
+        cancelFinishWatchdog()
+
+        handler.postDelayed({
+
+            if (
+                !active ||
+                currentSession != sessionId ||
+                finalDelivered
+            ) {
+                return@postDelayed
+            }
+
+            val text =
+                lastPartialText.trim()
+
+            finalDelivered = true
+
+            try {
+                recognizer?.stopListening()
+            } catch (_: Exception) {
+            }
+
+            if (text.isNotBlank()) {
+
+                onFinal(text)
+
+            } else {
+
+                onError()
+            }
+
+        }, 2500L)
+    }
+
+    private fun cancelFinishWatchdog() {
+        handler.removeCallbacksAndMessages(null)
+    }
+
     fun stop() {
+
         active = false
+        sessionId++
+
+        lastPartialText = ""
+        finalDelivered = false
+
+        cancelFinishWatchdog()
 
         try {
             recognizer?.stopListening()
@@ -198,7 +325,14 @@ class LiveSpeechRecognizer(private val context: Context) {
     }
 
     fun destroy() {
+
         active = false
+        sessionId++
+
+        lastPartialText = ""
+        finalDelivered = false
+
+        cancelFinishWatchdog()
 
         try {
             recognizer?.stopListening()
