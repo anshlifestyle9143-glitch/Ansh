@@ -87,12 +87,14 @@ class LiveSpeechRecognizer(private val context: Context) {
                     ) {
                         onListeningChange(false)
 
-                        scheduleRestart(
-                            onPartial,
-                            onFinal,
-                            onListeningChange,
-                            onError
-                        )
+                        if (active) {
+                            scheduleRestart(
+                                onPartial,
+                                onFinal,
+                                onListeningChange,
+                                onError
+                            )
+                        }
                     }
 
                     override fun onResults(
@@ -108,16 +110,30 @@ class LiveSpeechRecognizer(private val context: Context) {
 
                         onListeningChange(false)
 
+                        /*
+                         * IMPORTANT:
+                         * Final result means the current recognition
+                         * session is finished.
+                         *
+                         * Stop the recognizer immediately so it cannot
+                         * restart while the AI is processing/TTS is speaking.
+                         */
+                        try {
+                            recognizer?.stopListening()
+                        } catch (_: Exception) {
+                        }
+
                         if (!text.isNullOrBlank()) {
                             onFinal(text)
                         }
 
-                        scheduleRestart(
-                            onPartial,
-                            onFinal,
-                            onListeningChange,
-                            onError
-                        )
+                        /*
+                         * Do NOT restart here.
+                         *
+                         * VoiceConversationScreen will decide when the
+                         * next listening session should begin after the
+                         * AI/TTS flow is finished.
+                         */
                     }
 
                     override fun onPartialResults(
@@ -190,15 +206,19 @@ class LiveSpeechRecognizer(private val context: Context) {
             }
 
         try {
+
             recognizer?.startListening(intent)
+
         } catch (_: Exception) {
 
-            scheduleRestart(
-                onPartial,
-                onFinal,
-                onListeningChange,
-                onError
-            )
+            if (active) {
+                scheduleRestart(
+                    onPartial,
+                    onFinal,
+                    onListeningChange,
+                    onError
+                )
+            }
         }
     }
 
@@ -231,6 +251,7 @@ class LiveSpeechRecognizer(private val context: Context) {
                     onListeningChange,
                     onError
                 )
+
             },
             350L
         )
