@@ -36,6 +36,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,6 +57,8 @@ import com.example.ui.theme.VisionTextSecondary
 import com.example.ui.viewmodel.VisionViewModel
 import com.example.util.LiveSpeechRecognizer
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 private enum class VoiceCallState {
     IDLE,
@@ -89,6 +92,8 @@ fun VoiceConversationScreen(
     var listeningStarted by remember {
         mutableStateOf(false)
     }
+
+    val coroutineScope = rememberCoroutineScope()
 
     val speechRecognizer = remember {
         LiveSpeechRecognizer(context)
@@ -130,13 +135,50 @@ fun VoiceConversationScreen(
 
                 if (text.isNotBlank()) {
 
-                    callState =
-                        VoiceCallState.THINKING
+                    /*
+                     * -------------------------------------------------
+                     * COMMAND RECEIVED
+                     *
+                     * First say "Ok Boss".
+                     * Only after TTS finishes, start AI processing.
+                     * -------------------------------------------------
+                     */
 
-                    viewModel.sendMessage(
-                        overridePrompt = text,
-                        autoSpeak = true
-                    )
+                    callState =
+                        VoiceCallState.SPEAKING
+
+                    coroutineScope.launch {
+
+                        viewModel.ttsManager.speak(
+                            "Ok Boss",
+                            -System.currentTimeMillis()
+                        )
+
+                        /*
+                         * Wait until Ok Boss TTS actually starts.
+                         */
+                        viewModel.ttsManager.isSpeaking
+                            .first { it }
+
+                        /*
+                         * Wait until Ok Boss TTS completely finishes.
+                         */
+                        viewModel.ttsManager.isSpeaking
+                            .first { !it }
+
+                        if (!active) return@launch
+
+                        /*
+                         * Now start processing the command.
+                         */
+                        callState =
+                            VoiceCallState.THINKING
+
+                        viewModel.sendMessage(
+                            overridePrompt = text,
+                            autoSpeak = true
+                        )
+                    }
 
                 } else {
 
@@ -229,24 +271,56 @@ fun VoiceConversationScreen(
     }
 
     /*
-     * Wake-word activation enters this screen here.
-     * The popup is visible immediately.
+     * =============================================================
+     * WAKE WORD ACTIVATION
+     *
+     * Hey Jarvis
+     *      ↓
+     * Yes Boss
+     *      ↓
+     * TTS complete
+     *      ↓
+     * Microphone ON
+     * =============================================================
      */
     LaunchedEffect(Unit) {
-    callState = VoiceCallState.SPEAKING
 
-    viewModel.ttsManager.speak(
-        "Yes Boss",
-        -System.currentTimeMillis()
-    )
+        callState =
+            VoiceCallState.SPEAKING
 
-    delay(150L)
+        viewModel.ttsManager.speak(
+            "Yes Boss",
+            -System.currentTimeMillis()
+        )
 
-    if (active) {
-        requestListening()
+        /*
+         * Wait until Yes Boss TTS actually starts.
+         */
+        viewModel.ttsManager.isSpeaking
+            .first { it }
+
+        /*
+         * Wait until Yes Boss TTS finishes.
+         */
+        viewModel.ttsManager.isSpeaking
+            .first { !it }
+
+        /*
+         * Small safety gap before microphone starts.
+         * Kept at 150ms because it currently feels responsive.
+         */
+        delay(150L)
+
+        if (active) {
+            requestListening()
+        }
     }
-    }
 
+    /*
+     * =============================================================
+     * AI GENERATION STATE
+     * =============================================================
+     */
     LaunchedEffect(isGenerating) {
 
         if (!active) return@LaunchedEffect
@@ -262,6 +336,15 @@ fun VoiceConversationScreen(
         }
     }
 
+    /*
+     * =============================================================
+     * TTS STATE
+     *
+     * Used for AI-generated responses.
+     * During speech microphone stays OFF.
+     * After response speech ends, listening resumes.
+     * =============================================================
+     */
     LaunchedEffect(isSpeaking) {
 
         if (!active) return@LaunchedEffect
@@ -292,7 +375,18 @@ fun VoiceConversationScreen(
         }
     }
 
-    LaunchedEffect(isGenerating, isSpeaking) {
+    /*
+     * =============================================================
+     * THINKING → LISTENING
+     *
+     * After AI processing completes without TTS,
+     * listening can resume.
+     * =============================================================
+     */
+    LaunchedEffect(
+        isGenerating,
+        isSpeaking
+    ) {
 
         if (!active) return@LaunchedEffect
 
@@ -316,6 +410,11 @@ fun VoiceConversationScreen(
         }
     }
 
+    /*
+     * =============================================================
+     * VOICE ORB ANIMATION
+     * =============================================================
+     */
     val infiniteTransition =
         rememberInfiniteTransition(
             label = "voiceOrb"
@@ -364,7 +463,9 @@ fun VoiceConversationScreen(
     ) {
 
         /*
-         * Existing voice orb.
+         * =========================================================
+         * EXISTING VOICE ORB
+         * =========================================================
          */
         Column(
             modifier =
@@ -448,7 +549,9 @@ fun VoiceConversationScreen(
         }
 
         /*
-         * Close button.
+         * =========================================================
+         * CLOSE BUTTON
+         * =========================================================
          */
         IconButton(
             onClick = {
@@ -480,9 +583,9 @@ fun VoiceConversationScreen(
         }
 
         /*
-         * =====================================================
+         * =========================================================
          * VISION BOTTOM POPUP
-         * =====================================================
+         * =========================================================
          */
         Surface(
             modifier =
@@ -664,11 +767,5 @@ fun VoiceConversationScreen(
                 )
             }
         }
-
-        /*
-         * Manual microphone button is now inside
-         * the bottom popup, so no separate button
-         * is displayed here.
-         */
     }
 }
