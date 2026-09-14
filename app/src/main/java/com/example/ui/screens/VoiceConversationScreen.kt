@@ -200,14 +200,20 @@ fun VoiceConversationScreen(
 
                 } else {
 
-                    if (
-                        callState ==
-                            VoiceCallState.LISTENING
-                    ) {
-
-                        callState =
-                            VoiceCallState.THINKING
-                    }
+                    /*
+                     * IMPORTANT:
+                     *
+                     * onEndOfSpeech() does NOT mean that the final
+                     * recognition result has arrived.
+                     *
+                     * SpeechRecognizer normally calls onResults()
+                     * after onEndOfSpeech().
+                     *
+                     * Therefore we intentionally DO NOT change
+                     * LISTENING -> THINKING here.
+                     *
+                     * The final command is handled only by onFinal().
+                     */
                 }
             },
 
@@ -306,10 +312,10 @@ fun VoiceConversationScreen(
             .first { !it }
 
         /*
-         * Small safety gap before microphone starts.
-         * Kept at 150ms because it currently feels responsive.
+         * Safety gap between TTS releasing the audio path
+         * and SpeechRecognizer acquiring the microphone.
          */
-        delay(150L)
+        delay(400L)
 
         if (active) {
             requestListening()
@@ -340,7 +346,6 @@ fun VoiceConversationScreen(
      * =============================================================
      * TTS STATE
      *
-     * Used for AI-generated responses.
      * During speech microphone stays OFF.
      * After response speech ends, listening resumes.
      * =============================================================
@@ -420,104 +425,181 @@ fun VoiceConversationScreen(
             label = "voiceOrb"
         )
 
-    val pulse by
+    val pulseScale by
         infiniteTransition.animateFloat(
-            initialValue = 0.92f,
-            targetValue = 1.1f,
+            initialValue = 1f,
+            targetValue = 1.12f,
             animationSpec =
                 infiniteRepeatable(
                     animation =
-                        tween(1200),
+                        tween(
+                            durationMillis = 1100
+                        ),
                     repeatMode =
                         RepeatMode.Reverse
                 ),
-            label = "pulse"
+            label = "pulseScale"
         )
 
-    val orbColor =
-        when (callState) {
-
-            VoiceCallState.LISTENING ->
-                VisionDeepPlum
-
-            VoiceCallState.THINKING ->
-                VisionEmerald
-
-            VoiceCallState.SPEAKING ->
-                VisionIndigo
-
-            VoiceCallState.IDLE,
-            VoiceCallState.NO_PERMISSION ->
-                VisionDeepPlum.copy(
-                    alpha = 0.5f
-                )
-        }
+    val glowAlpha by
+        infiniteTransition.animateFloat(
+            initialValue = 0.25f,
+            targetValue = 0.55f,
+            animationSpec =
+                infiniteRepeatable(
+                    animation =
+                        tween(
+                            durationMillis = 1100
+                        ),
+                    repeatMode =
+                        RepeatMode.Reverse
+                ),
+            label = "glowAlpha"
+        )
 
     Box(
         modifier =
             Modifier
                 .fillMaxSize()
                 .background(
-                    VisionBackground
+                    Brush.verticalGradient(
+                        listOf(
+                            VisionBackground,
+                            VisionDeepPlum
+                        )
+                    )
                 )
     ) {
 
-        /*
-         * =========================================================
-         * EXISTING VOICE ORB
-         * =========================================================
-         */
         Column(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .padding(
-                        bottom = 170.dp
-                    ),
+                    .padding(20.dp),
             horizontalAlignment =
-                Alignment.CenterHorizontally,
-            verticalArrangement =
-                Arrangement.Center
+                Alignment.CenterHorizontally
         ) {
+
+            Row(
+                modifier =
+                    Modifier.fillMaxWidth(),
+                horizontalArrangement =
+                    Arrangement.End
+            ) {
+
+                IconButton(
+                    onClick = onExit
+                ) {
+
+                    Icon(
+                        imageVector =
+                            Icons.Default.Close,
+                        contentDescription =
+                            "Close",
+                        tint =
+                            VisionTextPrimary
+                    )
+                }
+            }
+
+            Spacer(
+                modifier =
+                    Modifier.height(50.dp)
+            )
 
             Box(
                 modifier =
                     Modifier
-                        .size(180.dp)
+                        .size(230.dp)
                         .graphicsLayer {
-
-                            val scale =
+                            scaleX =
                                 if (
                                     callState ==
-                                        VoiceCallState.IDLE ||
-                                    callState ==
-                                        VoiceCallState.NO_PERMISSION
+                                        VoiceCallState.LISTENING
                                 ) {
-                                    1f
+                                    pulseScale
                                 } else {
-                                    pulse
+                                    1f
                                 }
 
-                            scaleX = scale
-                            scaleY = scale
+                            scaleY =
+                                if (
+                                    callState ==
+                                        VoiceCallState.LISTENING
+                                ) {
+                                    pulseScale
+                                } else {
+                                    1f
+                                }
+
+                            alpha =
+                                if (
+                                    callState ==
+                                        VoiceCallState.LISTENING
+                                ) {
+                                    glowAlpha
+                                } else {
+                                    1f
+                                }
                         }
                         .clip(CircleShape)
                         .background(
                             Brush.radialGradient(
-                                colors =
-                                    listOf(
-                                        orbColor,
-                                        orbColor.copy(
-                                            alpha = 0.15f
-                                        )
-                                    )
+                                listOf(
+                                    VisionIndigo,
+                                    VisionEmerald
+                                )
                             )
-                        )
+                        ),
+                contentAlignment =
+                    Alignment.Center
+            ) {
+
+                Icon(
+                    imageVector =
+                        Icons.Default.Mic,
+                    contentDescription =
+                        "Voice",
+                    tint =
+                        Color.White,
+                    modifier =
+                        Modifier.size(70.dp)
+                )
+            }
+
+            Spacer(
+                modifier =
+                    Modifier.height(35.dp)
+            )
+
+            Text(
+                text =
+                    when (callState) {
+
+                        VoiceCallState.IDLE ->
+                            "Ready"
+
+                        VoiceCallState.LISTENING ->
+                            "Listening..."
+
+                        VoiceCallState.THINKING ->
+                            "Thinking..."
+
+                        VoiceCallState.SPEAKING ->
+                            "Speaking..."
+
+                        VoiceCallState.NO_PERMISSION ->
+                            "Microphone permission required"
+                    },
+                color =
+                    VisionTextPrimary,
+                fontSize =
+                    22.sp
             )
 
             Spacer(
                 modifier =
-                    Modifier.height(28.dp)
+                    Modifier.height(12.dp)
             )
 
             Text(
@@ -525,246 +607,68 @@ fun VoiceConversationScreen(
                     when (callState) {
 
                         VoiceCallState.LISTENING ->
-                            "Sun rahi hoon..."
+                            "Tell me what you need"
 
                         VoiceCallState.THINKING ->
-                            "Soch rahi hoon..."
+                            "Processing your command"
 
                         VoiceCallState.SPEAKING ->
-                            "Bol rahi hoon..."
-
-                        VoiceCallState.IDLE ->
-                            "Bolne ke liye mic dabao"
+                            "Vision is speaking"
 
                         VoiceCallState.NO_PERMISSION ->
-                            "Mic permission chahiye — settings me allow karo"
-                    },
+                            "Please allow microphone access"
 
+                        else ->
+                            "Vision Voice Assistant"
+                    },
                 color =
                     VisionTextSecondary,
-
                 fontSize =
-                    14.sp
+                    15.sp
             )
-        }
 
-        /*
-         * =========================================================
-         * CLOSE BUTTON
-         * =========================================================
-         */
-        IconButton(
-            onClick = {
-
-                active = false
-                listeningStarted = false
-
-                speechRecognizer.stop()
-                speechRecognizer.destroy()
-
-                onExit()
-            },
-
-            modifier =
-                Modifier
-                    .align(
-                        Alignment.TopStart
-                    )
-                    .padding(20.dp)
-        ) {
-
-            Icon(
-                Icons.Default.Close,
-                contentDescription =
-                    "End call",
-                tint =
-                    VisionTextPrimary
-            )
-        }
-
-        /*
-         * =========================================================
-         * VISION BOTTOM POPUP
-         * =========================================================
-         */
-        Surface(
-            modifier =
-                Modifier
-                    .align(
-                        Alignment.BottomCenter
-                    )
-                    .fillMaxWidth()
-                    .padding(
-                        start = 16.dp,
-                        end = 16.dp,
-                        bottom = 20.dp
-                    ),
-
-            shape =
-                RoundedCornerShape(
-                    28.dp
-                ),
-
-            color =
-                VisionDeepPlum.copy(
-                    alpha = 0.96f
-                ),
-
-            tonalElevation =
-                8.dp,
-
-            shadowElevation =
-                12.dp
-        ) {
-
-            Column(
+            Spacer(
                 modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(
-                            horizontal = 20.dp,
-                            vertical = 16.dp
-                        )
+                    Modifier.height(40.dp)
+            )
+
+            Surface(
+                modifier =
+                    Modifier.fillMaxWidth(),
+                shape =
+                    RoundedCornerShape(22.dp),
+                color =
+                    Color.White.copy(alpha = 0.08f)
             ) {
 
-                Row(
+                Column(
                     modifier =
-                        Modifier.fillMaxWidth(),
-                    verticalAlignment =
-                        Alignment.CenterVertically
+                        Modifier.padding(20.dp)
                 ) {
 
-                    Box(
-                        modifier =
-                            Modifier
-                                .size(42.dp)
-                                .clip(
-                                    CircleShape
-                                )
-                                .background(
-                                    orbColor
-                                ),
-                        contentAlignment =
-                            Alignment.Center
-                    ) {
-
-                        Icon(
-                            Icons.Default.Mic,
-                            contentDescription =
-                                "Vision microphone",
-                            tint =
-                                Color.White,
-                            modifier =
-                                Modifier.size(21.dp)
-                        )
-                    }
+                    Text(
+                        text =
+                            "Voice Mode",
+                        color =
+                            VisionTextPrimary,
+                        fontSize =
+                            17.sp
+                    )
 
                     Spacer(
                         modifier =
-                            Modifier.size(14.dp)
+                            Modifier.height(8.dp)
                     )
 
-                    Column(
-                        modifier =
-                            Modifier.weight(1f)
-                    ) {
-
-                        Text(
-                            text = "VISION",
-                            color =
-                                VisionTextPrimary,
-                            fontSize =
-                                16.sp
-                        )
-
-                        Spacer(
-                            modifier =
-                                Modifier.height(2.dp)
-                        )
-
-                        Text(
-                            text =
-                                when (callState) {
-
-                                    VoiceCallState.LISTENING ->
-                                        "Listening..."
-
-                                    VoiceCallState.THINKING ->
-                                        "Processing..."
-
-                                    VoiceCallState.SPEAKING ->
-                                        "Speaking..."
-
-                                    VoiceCallState.IDLE ->
-                                        "Ready"
-
-                                    VoiceCallState.NO_PERMISSION ->
-                                        "Microphone permission required"
-                                },
-
-                            color =
-                                VisionTextSecondary,
-
-                            fontSize =
-                                13.sp
-                        )
-                    }
-
-                    if (
-                        callState ==
-                            VoiceCallState.IDLE ||
-                        callState ==
-                            VoiceCallState.NO_PERMISSION
-                    ) {
-
-                        IconButton(
-                            onClick = {
-                                requestListening()
-                            }
-                        ) {
-
-                            Icon(
-                                Icons.Default.Mic,
-                                contentDescription =
-                                    "Start listening",
-                                tint =
-                                    Color.White
-                            )
-                        }
-                    }
+                    Text(
+                        text =
+                            "Say \"Hey Jarvis\" to activate Vision.",
+                        color =
+                            VisionTextSecondary,
+                        fontSize =
+                            14.sp
+                    )
                 }
-
-                Spacer(
-                    modifier =
-                        Modifier.height(10.dp)
-                )
-
-                Text(
-                    text =
-                        when (callState) {
-
-                            VoiceCallState.LISTENING ->
-                                "I'm listening for your command"
-
-                            VoiceCallState.THINKING ->
-                                "Working on your command..."
-
-                            VoiceCallState.SPEAKING ->
-                                "Vision is responding..."
-
-                            VoiceCallState.IDLE ->
-                                "Tap the microphone to speak"
-
-                            VoiceCallState.NO_PERMISSION ->
-                                "Allow microphone access to continue"
-                        },
-
-                    color =
-                        VisionTextSecondary,
-
-                    fontSize =
-                        12.sp
-                )
             }
         }
     }
