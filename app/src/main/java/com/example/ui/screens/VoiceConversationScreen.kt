@@ -140,8 +140,11 @@ fun VoiceConversationScreen(
                      * -------------------------------------------------
                      * COMMAND RECEIVED
                      *
-                     * First say "Ok Boss".
-                     * Only after TTS finishes, start AI processing.
+                     * Current voice-page behaviour:
+                     * say "Ok Boss" before AI processing.
+                     *
+                     * This will be changed later so that "Ok Boss"
+                     * is spoken ONLY for actual actions/commands.
                      * -------------------------------------------------
                      */
 
@@ -156,26 +159,38 @@ fun VoiceConversationScreen(
                         )
 
                         /*
-                         * TTS is asynchronous. Do not wait forever if the
-                         * Android TTS/Gemini TTS engine fails to start.
-                         * If it starts, wait for the normal completion.
+                         * TTS is asynchronous.
+                         * Wait for TTS to actually start.
                          */
                         val okBossStarted =
                             withTimeoutOrNull(3000L) {
-                                viewModel.ttsManager.isSpeaking.first { it }
+
+                                viewModel
+                                    .ttsManager
+                                    .isSpeaking
+                                    .first { it }
+
                                 true
+
                             } == true
 
                         if (okBossStarted) {
+
                             withTimeoutOrNull(10000L) {
-                                viewModel.ttsManager.isSpeaking.first { !it }
+
+                                viewModel
+                                    .ttsManager
+                                    .isSpeaking
+                                    .first { !it }
                             }
                         }
 
-                        if (!active) return@launch
+                        if (!active) {
+                            return@launch
+                        }
 
                         /*
-                         * Now start processing the command.
+                         * Start AI processing.
                          */
                         callState =
                             VoiceCallState.THINKING
@@ -188,6 +203,12 @@ fun VoiceConversationScreen(
 
                 } else {
 
+                    /*
+                     * Empty result.
+                     *
+                     * Continuous recognizer itself is still alive.
+                     * The next listening session can start normally.
+                     */
                     callState =
                         VoiceCallState.IDLE
                 }
@@ -195,7 +216,9 @@ fun VoiceConversationScreen(
 
             onListeningChange = { listening ->
 
-                if (!active) return@start
+                if (!active) {
+                    return@start
+                }
 
                 if (listening) {
 
@@ -207,24 +230,52 @@ fun VoiceConversationScreen(
                 } else {
 
                     /*
-                     * SpeechRecognizer may report onEndOfSpeech before
-                     * onResults. Do not change LISTENING -> THINKING here;
-                     * the final callback is responsible for command flow.
-                     * This prevents a state race while the recognizer is
-                     * still preparing the final result.
+                     * IMPORTANT:
+                     *
+                     * Do NOT turn the screen into IDLE here.
+                     *
+                     * SpeechRecognizer can report onEndOfSpeech()
+                     * before onResults().
+                     *
+                     * The final result/error callback controls the
+                     * actual conversation state.
                      */
                 }
             },
 
             onError = {
 
-                if (!active) return@start
+                if (!active) {
+                    return@start
+                }
 
                 listeningStarted = false
 
+                /*
+                 * In continuous mode LiveSpeechRecognizer handles
+                 * temporary recognition failures/restarts.
+                 *
+                 * Keep the screen available instead of closing
+                 * the conversation.
+                 */
                 callState =
                     VoiceCallState.IDLE
-            }
+            },
+
+            /*
+             * =========================================================
+             * IMPORTANT
+             *
+             * TRUE = Voice-to-Voice page
+             *
+             * This disables the recognizer's 2.5-second finish
+             * watchdog that is used by the wake overlay.
+             *
+             * The user can keep using voice conversation until
+             * the user presses the close button.
+             * =========================================================
+             */
+            continuous = true
         )
     }
 
@@ -300,23 +351,32 @@ fun VoiceConversationScreen(
 
         /*
          * Never block the voice flow forever if TTS does not start.
-         * When TTS starts normally, wait for it to finish.
          */
         val yesBossStarted =
             withTimeoutOrNull(3000L) {
-                viewModel.ttsManager.isSpeaking.first { it }
+
+                viewModel
+                    .ttsManager
+                    .isSpeaking
+                    .first { it }
+
                 true
+
             } == true
 
         if (yesBossStarted) {
+
             withTimeoutOrNull(10000L) {
-                viewModel.ttsManager.isSpeaking.first { !it }
+
+                viewModel
+                    .ttsManager
+                    .isSpeaking
+                    .first { !it }
             }
         }
 
         /*
          * Small safety gap before microphone starts.
-         * Kept at 400ms to give TTS time to release audio focus.
          */
         delay(400L)
 
@@ -332,7 +392,9 @@ fun VoiceConversationScreen(
      */
     LaunchedEffect(isGenerating) {
 
-        if (!active) return@LaunchedEffect
+        if (!active) {
+            return@LaunchedEffect
+        }
 
         if (isGenerating) {
 
@@ -341,6 +403,10 @@ fun VoiceConversationScreen(
             callState =
                 VoiceCallState.THINKING
 
+            /*
+             * Stop current recognition while Vision is processing
+             * the user's request.
+             */
             speechRecognizer.stop()
         }
     }
@@ -352,7 +418,9 @@ fun VoiceConversationScreen(
      */
     LaunchedEffect(isSpeaking) {
 
-        if (!active) return@LaunchedEffect
+        if (!active) {
+            return@LaunchedEffect
+        }
 
         if (isSpeaking) {
 
@@ -383,8 +451,13 @@ fun VoiceConversationScreen(
      * =============================================================
      * AFTER AI RESPONSE
      *
-     * When Vision finishes speaking, return to listening so the user
-     * can give another command.
+     * When Vision finishes speaking, return to listening.
+     *
+     * IMPORTANT:
+     *
+     * There is NO 3-second timeout here.
+     *
+     * The voice page remains active until the user presses Close.
      * =============================================================
      */
     LaunchedEffect(
@@ -392,7 +465,9 @@ fun VoiceConversationScreen(
         isSpeaking
     ) {
 
-        if (!active) return@LaunchedEffect
+        if (!active) {
+            return@LaunchedEffect
+        }
 
         if (
             !isGenerating &&
