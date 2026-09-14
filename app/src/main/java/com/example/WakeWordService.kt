@@ -142,7 +142,7 @@ class WakeWordService : Service() {
 
                             /*
                              * Stop accepting another wake word
-                             * while Vision is responding.
+                             * while Vision is handling the task.
                              */
                             running = false
 
@@ -317,17 +317,19 @@ class WakeWordService : Service() {
                 )
 
                 /*
-                 * Step 5 test:
-                 * keep the hologram visible for 5 seconds,
-                 * then return to passive wake-word listening.
+                 * IMPORTANT:
+                 *
+                 * The overlay does NOT disappear automatically.
+                 *
+                 * It will remain visible until the Vision
+                 * task controller explicitly calls:
+                 *
+                 * removeVisionOverlay()
+                 *
+                 * After the task is complete, the controller
+                 * will also stop the command microphone and
+                 * restart passive wake-word detection.
                  */
-                mainHandler.postDelayed(
-                    {
-                        removeVisionOverlay()
-                        scheduleRestart()
-                    },
-                    OVERLAY_DURATION_MS
-                )
 
             } catch (e: Exception) {
 
@@ -554,8 +556,5 @@ class WakeWordService : Service() {
 
         private const val SCREEN_WAKE_DURATION_MS =
             3000L
-
-        private const val OVERLAY_DURATION_MS =
-            5000L
     }
 }
