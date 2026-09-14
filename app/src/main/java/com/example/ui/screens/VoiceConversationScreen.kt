@@ -233,15 +233,18 @@ fun VoiceConversationScreen(
      * The popup is visible immediately.
      */
     LaunchedEffect(Unit) {
+    callState = VoiceCallState.SPEAKING
 
-        callState =
-            VoiceCallState.LISTENING
+    viewModel.ttsManager.speak(
+        "Yes Boss",
+        -System.currentTimeMillis()
+    )
 
-        delay(600L)
+    delay(600L)
 
-        if (active) {
-            requestListening()
-        }
+    if (active) {
+        requestListening()
+    }
     }
 
     LaunchedEffect(isGenerating) {
