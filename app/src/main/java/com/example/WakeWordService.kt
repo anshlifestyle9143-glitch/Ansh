@@ -5,19 +5,19 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
-import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.example.MainActivity
-import com.rementia.openwakeword.lib.model.DetectionMode
 import com.rementia.openwakeword.lib.WakeWordEngine
+import com.rementia.openwakeword.lib.model.DetectionMode
 import com.rementia.openwakeword.lib.model.WakeWordModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
@@ -28,12 +28,21 @@ class WakeWordService : Service() {
 
     private var wakeWordEngine: WakeWordEngine? = null
     private var detectionJob: Job? = null
+
+    @Volatile
     private var running = false
+
+    @Volatile
+    private var restarting = false
 
     override fun onCreate() {
         super.onCreate()
 
-        wakeWordEngine = WakeWordEngine(
+        wakeWordEngine = createWakeWordEngine()
+    }
+
+    private fun createWakeWordEngine(): WakeWordEngine {
+        return WakeWordEngine(
             context = this,
             models = listOf(
                 WakeWordModel(
@@ -59,7 +68,6 @@ class WakeWordService : Service() {
         )
 
         if (!running) {
-            running = true
             startWakeWordDetection()
         }
 
@@ -68,7 +76,15 @@ class WakeWordService : Service() {
 
     private fun startWakeWordDetection() {
 
-        val engine = wakeWordEngine ?: return
+        if (running) return
+
+        val engine = wakeWordEngine ?: run {
+            wakeWordEngine = createWakeWordEngine()
+            wakeWordEngine ?: return
+        }
+
+        running = true
+        restarting = false
 
         detectionJob?.cancel()
 
@@ -76,93 +92,141 @@ class WakeWordService : Service() {
 
             try {
 
-                engine.detections.collect { detection ->
+                launch {
+                    engine.detections.collect { detection ->
 
-                    if (!running) {
-                        return@collect
+                        if (!running) return@collect
+
+                        Log.d(
+                            TAG,
+                            "Wake word detected: " +
+                                    "${detection.model.name}, " +
+                                    "score=${detection.score}"
+                        )
+
+                        running = false
+
+                        try {
+                            engine.stop()
+                        } catch (e: Exception) {
+                            Log.w(
+                                TAG,
+                                "Engine stop warning",
+                                e
+                            )
+                        }
+
+                        launchVoiceCall()
                     }
+                }
+
+                try {
+                    engine.start()
 
                     Log.d(
                         TAG,
-                        "Wake word detected: " +
-                                "${detection.model.name}, " +
-                                "score=${detection.score}"
+                        "Wake-word detection started"
+                    )
+
+                } catch (e: Exception) {
+
+                    Log.e(
+                        TAG,
+                        "Unable to start wake-word engine",
+                        e
                     )
 
                     running = false
-
-                    /*
-                     * IMPORTANT: stop() alone does not fully
-                     * release the AudioRecord resource. We must
-                     * also call release() here (not just in
-                     * onDestroy(), which runs asynchronously)
-                     * so the microphone is completely free
-                     * before the voice-call screen tries to
-                     * start its own SpeechRecognizer.
-                     */
-                    engine.stop()
-                    engine.release()
-                    wakeWordEngine = null
-
-                    launchVoiceCall()
-
-                    stopSelf()
+                    scheduleRestart()
                 }
 
             } catch (e: Exception) {
 
                 Log.e(
                     TAG,
-                    "Wake word detection stopped",
+                    "Wake-word detection crashed",
                     e
                 )
+
+                running = false
+                scheduleRestart()
             }
         }
+    }
 
-        try {
+    private fun scheduleRestart() {
 
-            engine.start()
+        if (restarting) return
 
-        } catch (e: IllegalStateException) {
+        restarting = true
 
-            Log.e(
-                TAG,
-                "Unable to start wake word engine. " +
-                        "Check RECORD_AUDIO permission.",
-                e
-            )
+        serviceScope.launch {
 
-            running = false
-            stopSelf()
+            delay(RESTART_DELAY_MS)
+
+            if (!running) {
+
+                try {
+                    wakeWordEngine?.stop()
+                } catch (_: Exception) {
+                }
+
+                try {
+                    wakeWordEngine?.release()
+                } catch (_: Exception) {
+                }
+
+                wakeWordEngine = createWakeWordEngine()
+
+                restarting = false
+
+                startWakeWordDetection()
+            }
         }
     }
 
     private fun launchVoiceCall() {
 
-        val intent = Intent(
-            this,
-            MainActivity::class.java
-        ).apply {
+        try {
 
-            addFlags(
-                Intent.FLAG_ACTIVITY_NEW_TASK or
-                        Intent.FLAG_ACTIVITY_CLEAR_TOP
+            val intent = Intent(
+                this,
+                MainActivity::class.java
+            ).apply {
+
+                addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK or
+                            Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                            Intent.FLAG_ACTIVITY_SINGLE_TOP
+                )
+
+                putExtra(
+                    MainActivity.EXTRA_OPEN_VOICE_CALL,
+                    true
+                )
+            }
+
+            startActivity(intent)
+
+        } catch (e: Exception) {
+
+            Log.e(
+                TAG,
+                "Unable to launch voice screen",
+                e
             )
 
-            putExtra(
-                MainActivity.EXTRA_OPEN_VOICE_CALL,
-                true
-            )
+            scheduleRestart()
         }
-
-        startActivity(intent)
     }
 
     private fun buildNotification(): Notification {
 
         val channelId = "vision_wake_word"
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        if (android.os.Build.VERSION.SDK_INT >=
+            android.os.Build.VERSION_CODES.O
+        ) {
 
             val channel = NotificationChannel(
                 channelId,
@@ -193,10 +257,20 @@ class WakeWordService : Service() {
     override fun onDestroy() {
 
         running = false
+        restarting = false
 
         detectionJob?.cancel()
+        detectionJob = null
 
-        wakeWordEngine?.release()
+        try {
+            wakeWordEngine?.stop()
+        } catch (_: Exception) {
+        }
+
+        try {
+            wakeWordEngine?.release()
+        } catch (_: Exception) {
+        }
 
         wakeWordEngine = null
 
@@ -205,16 +279,14 @@ class WakeWordService : Service() {
         super.onDestroy()
     }
 
-    override fun onBind(
-        intent: Intent?
-    ): IBinder? = null
+    override fun onBind(intent: Intent?): IBinder? = null
 
     companion object {
 
-        private const val TAG =
-            "VisionWakeWord"
+        private const val TAG = "VisionWakeWord"
 
-        private const val NOTIFICATION_ID =
-            4201
+        private const val NOTIFICATION_ID = 4201
+
+        private const val RESTART_DELAY_MS = 1500L
     }
 }
