@@ -16,33 +16,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
-/**
- * VisionVoiceController
- *
- * Wake-word voice pipeline:
- *
- * Hey Jarvis
- *      ↓
- * Yes Boss
- *      ↓
- * Microphone ON
- *      ↓
- * User speech
- *      ↓
- * Semantic AI Intent Classification
- *      ↓
- * ┌──────────────────────────────────────────────┐
- * │ ACTION       → Yes → Ok Boss → execute       │
- * │ CONVERSATION → natural conversation          │
- * │ QUESTION     → natural answer/search         │
- * │ SEARCH       → search/AI response            │
- * │ UNCLEAR      → clarification                 │
- * └──────────────────────────────────────────────┘
- *
- * IMPORTANT:
- * No hard-coded user-command keyword matching is
- * performed here.
- */
 class VisionVoiceController(
     private val context: Context,
     private val ttsManager: GeminiTtsManager
@@ -50,7 +23,6 @@ class VisionVoiceController(
 
     companion object {
         private const val TAG = "VisionVoiceController"
-
         private const val MAX_RECOGNITION_RETRIES = 2
     }
 
@@ -73,14 +45,23 @@ class VisionVoiceController(
     private var recognitionRetryCount = 0
 
     /**
-     * Keeps the latest listening callback so that
-     * the controller can return to listening after
-     * clarification or another internal voice phase.
+     * Stores the latest listening callback so that
+     * Vision can return to listening after clarification.
      */
     private var onListeningCallback: () -> Unit = {}
 
     /**
-     * Starts the wake-word voice interaction.
+     * Starts the voice interaction after wake word detection.
+     *
+     * Flow:
+     *
+     * Hey Jarvis
+     *      ↓
+     * Yes Boss
+     *      ↓
+     * Listen
+     *      ↓
+     * Semantic intent classification
      */
     fun start(
         onListening: () -> Unit = {},
@@ -98,11 +79,10 @@ class VisionVoiceController(
 
         /*
          * IMPORTANT:
-         * Save the callback immediately after activating
-         * the controller.
+         * Save callback immediately.
          *
-         * This is required when the controller needs to
-         * start listening again later.
+         * This is used later if Vision needs to
+         * return to listening after clarification.
          */
         active = true
         onListeningCallback = onListening
@@ -115,7 +95,7 @@ class VisionVoiceController(
 
             /*
              * ---------------------------------------------
-             * 1. WAKE WORD RESPONSE
+             * WAKE WORD RESPONSE
              * ---------------------------------------------
              */
 
@@ -131,8 +111,7 @@ class VisionVoiceController(
             }
 
             /*
-             * Give TTS/audio system time to release
-             * before opening the microphone.
+             * Allow TTS/audio system to release.
              */
             delay(700L)
 
@@ -142,7 +121,7 @@ class VisionVoiceController(
 
             /*
              * ---------------------------------------------
-             * 2. START USER LISTENING
+             * START LISTENING
              * ---------------------------------------------
              */
 
@@ -163,8 +142,7 @@ class VisionVoiceController(
     }
 
     /**
-     * Starts speech recognition for the current
-     * voice interaction.
+     * Starts recognition for the active voice session.
      */
     private fun listenForInput(
         onListening: () -> Unit,
@@ -179,6 +157,9 @@ class VisionVoiceController(
             return
         }
 
+        /*
+         * Check microphone permission.
+         */
         if (
             ContextCompat.checkSelfPermission(
                 context,
@@ -226,8 +207,7 @@ class VisionVoiceController(
                 )
 
                 /*
-                 * Partial speech is intentionally NOT
-                 * classified.
+                 * Do NOT classify partial speech.
                  *
                  * Vision waits for the complete sentence.
                  */
@@ -271,21 +251,14 @@ class VisionVoiceController(
 
                 /*
                  * -----------------------------------------
-                 * SEMANTIC AI INTENT LAYER
+                 * SEMANTIC INTENT CLASSIFICATION
                  * -----------------------------------------
                  *
-                 * The complete natural-language input is
-                 * passed to VisionIntentClassifier.
+                 * The complete sentence is passed to
+                 * VisionIntentClassifier.
                  *
-                 * No:
-                 *
-                 * text.contains("flashlight")
-                 * text.contains("light")
-                 * text.contains("call")
-                 *
-                 * etc.
-                 *
-                 * The classifier understands the meaning.
+                 * There is NO hard-coded command matching
+                 * here.
                  */
 
                 classifyIntent(
@@ -326,9 +299,9 @@ class VisionVoiceController(
                     )
 
                     /*
-                     * DO NOT stop controller here.
+                     * Do NOT stop Vision here.
                      *
-                     * Recognition can report false between
+                     * The recognizer can report false between
                      * speech phases.
                      */
                 }
@@ -336,7 +309,7 @@ class VisionVoiceController(
 
             /*
              * ---------------------------------------------
-             * RECOGNITION ERROR
+             * ERROR HANDLING
              * ---------------------------------------------
              */
 
@@ -398,25 +371,36 @@ class VisionVoiceController(
 
             /*
              * ---------------------------------------------
-             * IMPORTANT
+             * CONTINUOUS MODE
              * ---------------------------------------------
              *
-             * Continuous mode disables the short
-             * 2.5-second watchdog inside
-             * LiveSpeechRecognizer.
+             * This disables the short watchdog timeout
+             * inside LiveSpeechRecognizer.
              *
-             * This keeps the active voice conversation
-             * alive until Vision itself decides to stop.
+             * The active voice session is therefore controlled
+             * by VisionVoiceController rather than being
+             * automatically killed after a few seconds.
              */
             continuous = true
         )
     }
 
     /**
-     * Semantic intent classification.
+     * Performs semantic intent classification.
      *
-     * The user's complete sentence is sent to the
-     * AI intent layer. This is NOT a keyword matcher.
+     * IMPORTANT:
+     * This does NOT inspect user text using keywords.
+     *
+     * Example:
+     *
+     * "Kaise ho?"
+     *      → CONVERSATION
+     *
+     * "Phone ki torch jala do"
+     *      → ACTION
+     *
+     * "India ki capital kya hai?"
+     *      → QUESTION
      */
     private fun classifyIntent(
         text: String,
@@ -439,8 +423,16 @@ class VisionVoiceController(
                     "Classifying semantic intent: [$text]"
                 )
 
+                /*
+                 * IMPORTANT:
+                 *
+                 * VisionIntentClassifier currently has
+                 * a no-argument constructor.
+                 *
+                 * DO NOT pass context here.
+                 */
                 val classifier =
-                    VisionIntentClassifier(context)
+                    VisionIntentClassifier()
 
                 val result =
                     classifier.classify(text)
@@ -461,14 +453,8 @@ class VisionVoiceController(
                      * ACTION
                      * -------------------------------------
                      *
-                     * Example:
-                     *
-                     * "Phone ki torch on kar do"
-                     * "Andhera hai light jala do"
-                     * "Flashlight band kar do"
-                     *
-                     * All can map to ACTION without
-                     * hard-coded sentence matching.
+                     * Only actual action requests receive
+                     * "Ok Boss".
                      */
                     VisionIntentClassifier.IntentType.ACTION -> {
 
@@ -483,6 +469,10 @@ class VisionVoiceController(
                             return@launch
                         }
 
+                        /*
+                         * Send the ORIGINAL complete command
+                         * to the command executor.
+                         */
                         onCommand(text)
                     }
 
@@ -490,10 +480,6 @@ class VisionVoiceController(
                      * -------------------------------------
                      * CONVERSATION
                      * -------------------------------------
-                     *
-                     * Example:
-                     *
-                     * "Kaise ho?"
                      *
                      * No "Ok Boss".
                      */
@@ -512,9 +498,7 @@ class VisionVoiceController(
                      * QUESTION
                      * -------------------------------------
                      *
-                     * Example:
-                     *
-                     * "Aaj mausam kaisa hai?"
+                     * No "Ok Boss".
                      */
                     VisionIntentClassifier.IntentType.QUESTION -> {
 
@@ -530,9 +514,6 @@ class VisionVoiceController(
                      * -------------------------------------
                      * SEARCH
                      * -------------------------------------
-                     *
-                     * Search/web handling is delegated
-                     * to the higher AI layer.
                      */
                     VisionIntentClassifier.IntentType.SEARCH -> {
 
@@ -549,8 +530,8 @@ class VisionVoiceController(
                      * UNCLEAR
                      * -------------------------------------
                      *
-                     * Vision asks for clarification
-                     * instead of guessing.
+                     * Ask user to clarify instead of
+                     * guessing an action.
                      */
                     VisionIntentClassifier.IntentType.UNCLEAR -> {
 
@@ -568,16 +549,17 @@ class VisionVoiceController(
                             return@launch
                         }
 
-                        /*
-                         * Return to listening after the
-                         * clarification.
-                         */
                         delay(400L)
 
                         if (!active) {
                             return@launch
                         }
 
+                        /*
+                         * Return to listening.
+                         *
+                         * This uses the callback saved in start().
+                         */
                         listenForInput(
                             onListening = onListeningCallback,
                             onThinking = {},
@@ -602,11 +584,12 @@ class VisionVoiceController(
                 }
 
                 /*
-                 * If semantic classification fails,
-                 * do not blindly say "Ok Boss".
+                 * SAFETY:
                  *
-                 * Send the text to the normal AI
-                 * conversation layer instead.
+                 * If classification fails, do NOT execute
+                 * a device action.
+                 *
+                 * Send it to the normal AI conversation layer.
                  */
                 onConversation(text)
             }
@@ -614,8 +597,7 @@ class VisionVoiceController(
     }
 
     /**
-     * Speaks a short system response and waits for
-     * TTS completion before continuing.
+     * Speaks text and waits for TTS completion.
      */
     private suspend fun speakAndWait(
         text: String,
@@ -639,7 +621,7 @@ class VisionVoiceController(
         )
 
         /*
-         * Wait until TTS enters speaking state.
+         * Wait for TTS to start.
          */
         val started =
             withTimeoutOrNull(3000L) {
@@ -660,7 +642,7 @@ class VisionVoiceController(
             )
 
             /*
-             * Wait until TTS finishes.
+             * Wait for TTS to finish.
              */
             withTimeoutOrNull(10000L) {
 
@@ -686,9 +668,6 @@ class VisionVoiceController(
 
     /**
      * Stops the current voice interaction.
-     *
-     * WakeWordService can restart passive wake-word
-     * listening after the voice session is finished.
      */
     fun stop() {
 
@@ -719,7 +698,7 @@ class VisionVoiceController(
     }
 
     /**
-     * Completely releases controller resources.
+     * Completely releases resources.
      */
     fun destroy() {
 
