@@ -67,16 +67,9 @@ class VisionOverlayView(
         val cx =
             width / 2f
 
-        /*
-         * Orb is intentionally kept in the
-         * upper portion of the hologram.
-         */
         val cy =
             height * 0.32f
 
-        /*
-         * Larger and much more visible orb.
-         */
         val baseRadius =
             width * 0.145f
 
@@ -89,9 +82,6 @@ class VisionOverlayView(
             baseRadius *
                 (1f + pulseAmount)
 
-        /*
-         * Outer holographic atmosphere.
-         */
         drawOuterGlow(
             canvas,
             cx,
@@ -99,9 +89,6 @@ class VisionOverlayView(
             radius
         )
 
-        /*
-         * Three independent rotating rings.
-         */
         drawRings(
             canvas,
             cx,
@@ -109,9 +96,6 @@ class VisionOverlayView(
             radius
         )
 
-        /*
-         * Main energy orb.
-         */
         drawOrb(
             canvas,
             cx,
@@ -119,9 +103,6 @@ class VisionOverlayView(
             radius
         )
 
-        /*
-         * Energy beam from orb to stand.
-         */
         drawEnergyColumn(
             canvas,
             cx,
@@ -129,9 +110,6 @@ class VisionOverlayView(
             radius
         )
 
-        /*
-         * Bottom holographic projector stand.
-         */
         drawStand(
             canvas,
             cx
@@ -205,9 +183,6 @@ class VisionOverlayView(
 
         paint.style =
             Paint.Style.STROKE
-
-        paint.strokeWidth =
-            4.0f
 
         val ringColors =
             intArrayOf(
@@ -299,7 +274,6 @@ class VisionOverlayView(
                 rotation *
                     direction +
                     i * 120f,
-
                 cx,
                 cy
             )
@@ -314,10 +288,6 @@ class VisionOverlayView(
             paint.clearShadowLayer()
         }
 
-        /*
-         * Small rotating energy points
-         * make the hologram feel alive.
-         */
         drawEnergyPoints(
             canvas,
             cx,
@@ -470,9 +440,6 @@ class VisionOverlayView(
 
         paint.clearShadowLayer()
 
-        /*
-         * Bright outer orb boundary.
-         */
         paint.style =
             Paint.Style.STROKE
 
@@ -508,9 +475,6 @@ class VisionOverlayView(
 
         paint.clearShadowLayer()
 
-        /*
-         * Inner energy core.
-         */
         paint.style =
             Paint.Style.FILL
 
@@ -558,9 +522,6 @@ class VisionOverlayView(
         val endY =
             height * 0.76f
 
-        /*
-         * Main beam.
-         */
         paint.style =
             Paint.Style.STROKE
 
@@ -597,9 +558,6 @@ class VisionOverlayView(
 
         paint.clearShadowLayer()
 
-        /*
-         * Bright center beam.
-         */
         paint.strokeWidth =
             1.5f
 
@@ -619,9 +577,6 @@ class VisionOverlayView(
             paint
         )
 
-        /*
-         * Moving scan pulse.
-         */
         val scanY =
             startY +
                 (
@@ -661,4 +616,162 @@ class VisionOverlayView(
         )
 
         paint.clearShadowLayer()
-   
+    }
+
+    private fun drawStand(
+        canvas: Canvas,
+        cx: Float
+    ) {
+
+        val top =
+            height * 0.76f
+
+        paint.style =
+            Paint.Style.FILL
+
+        paint.setShadowLayer(
+            22f,
+            0f,
+            0f,
+            Color.argb(
+                210,
+                50,
+                210,
+                255
+            )
+        )
+
+        paint.color =
+            Color.argb(
+                105,
+                40,
+                165,
+                255
+            )
+
+        canvas.drawRoundRect(
+            RectF(
+                cx -
+                    width * 0.13f,
+
+                top,
+
+                cx +
+                    width * 0.13f,
+
+                top +
+                    height * 0.13f
+            ),
+            20f,
+            20f,
+            paint
+        )
+
+        paint.clearShadowLayer()
+
+        paint.color =
+            Color.argb(
+                185,
+                80,
+                225,
+                255
+            )
+
+        canvas.drawRoundRect(
+            RectF(
+                cx -
+                    width * 0.025f,
+
+                top,
+
+                cx +
+                    width * 0.025f,
+
+                top +
+                    height * 0.13f
+            ),
+            8f,
+            8f,
+            paint
+        )
+
+        paint.setShadowLayer(
+            22f,
+            0f,
+            0f,
+            Color.argb(
+                220,
+                60,
+                215,
+                255
+            )
+        )
+
+        paint.color =
+            Color.argb(
+                215,
+                65,
+                205,
+                255
+            )
+
+        canvas.drawRoundRect(
+            RectF(
+                cx -
+                    width * 0.20f,
+
+                height * 0.91f,
+
+                cx +
+                    width * 0.20f,
+
+                height * 0.965f
+            ),
+            16f,
+            16f,
+            paint
+        )
+
+        paint.clearShadowLayer()
+
+        paint.style =
+            Paint.Style.STROKE
+
+        paint.strokeWidth =
+            2.5f
+
+        paint.color =
+            Color.argb(
+                240,
+                170,
+                250,
+                255
+            )
+
+        canvas.drawRoundRect(
+            RectF(
+                cx -
+                    width * 0.17f,
+
+                height * 0.915f,
+
+                cx +
+                    width * 0.17f,
+
+                height * 0.95f
+            ),
+            12f,
+            12f,
+            paint
+        )
+    }
+
+    override fun onDetachedFromWindow() {
+
+        removeCallbacks(
+            runnable
+        )
+
+        super.onDetachedFromWindow()
+    }
+}
