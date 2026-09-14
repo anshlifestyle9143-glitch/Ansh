@@ -436,8 +436,9 @@ class WakeWordService : Service() {
                                 )
 
                                 ttsManager?.speak(
-                                    "Boss, command executor available nahi hai."
-                                )
+    "Boss, command executor available nahi hai.",
+    System.currentTimeMillis()
+)
 
                                 delay(1500L)
 
@@ -460,8 +461,11 @@ class WakeWordService : Service() {
                             )
 
                             ttsManager?.speak(
-                                result.message
-                            )
+    result.message,
+    System.currentTimeMillis()
+)
+                                
+                            
 
                             /*
                              * Give TTS time to finish before
@@ -482,8 +486,11 @@ class WakeWordService : Service() {
                             )
 
                             ttsManager?.speak(
-                                "Sorry Boss, command execute nahi ho paya."
-                            )
+    "Sorry Boss, command execute nahi ho paya.",
+    System.currentTimeMillis()
+)
+                                
+                            
 
                             delay(1500L)
 
