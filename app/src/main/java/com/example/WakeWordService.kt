@@ -1,11 +1,13 @@
 package com.example.service
 
+import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.PixelFormat
 import android.os.Handler
 import android.os.IBinder
@@ -18,6 +20,8 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.FrameLayout
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
+import com.example.util.GeminiTtsManager
 import com.rementia.openwakeword.lib.WakeWordEngine
 import com.rementia.openwakeword.lib.model.DetectionMode
 import com.rementia.openwakeword.lib.model.WakeWordModel
@@ -46,16 +50,31 @@ class WakeWordService : Service() {
     private var overlayView: View? = null
     private var overlayWindowManager: WindowManager? = null
 
+    private var voiceController: VisionVoiceController? = null
+    private var ttsManager: GeminiTtsManager? = null
+
     @Volatile
     private var running = false
 
     @Volatile
     private var restarting = false
 
+    @Volatile
+    private var voiceActive = false
+
     override fun onCreate() {
         super.onCreate()
 
         createNotificationChannel()
+
+        ttsManager =
+            GeminiTtsManager(this)
+
+        voiceController =
+            VisionVoiceController(
+                context = this,
+                ttsManager = ttsManager!!
+            )
 
         wakeWordEngine =
             createWakeWordEngine()
@@ -70,10 +89,7 @@ class WakeWordService : Service() {
                 listOf(
                     WakeWordModel(
                         name = "Hey Jarvis",
-
-                        modelPath =
-                            "hey_jarvis_v0.1.onnx",
-
+                        modelPath = "hey_jarvis_v0.1.onnx",
                         threshold = 0.10f
                     )
                 ),
@@ -97,22 +113,16 @@ class WakeWordService : Service() {
             buildNotification()
         )
 
-        if (!running) {
+        if (!running && !voiceActive) {
             startWakeWordDetection()
         }
 
-        /*
-         * IMPORTANT:
-         *
-         * START_STICKY tells Android that this service
-         * should be recreated if Android kills it.
-         */
         return START_STICKY
     }
 
     private fun startWakeWordDetection() {
 
-        if (running) {
+        if (running || voiceActive) {
             return
         }
 
@@ -139,7 +149,7 @@ class WakeWordService : Service() {
 
                     engine.detections.collect { detection ->
 
-                        if (!running) {
+                        if (!running || voiceActive) {
                             return@collect
                         }
 
@@ -150,18 +160,11 @@ class WakeWordService : Service() {
                                 "score=${detection.score}"
                         )
 
-                        /*
-                         * Stop accepting another wake word
-                         * while Vision is handling this event.
-                         */
                         running = false
 
                         try {
-
                             engine.stop()
-
                         } catch (e: Exception) {
-
                             Log.w(
                                 TAG,
                                 "Engine stop warning",
@@ -170,11 +173,8 @@ class WakeWordService : Service() {
                         }
 
                         try {
-
                             engine.release()
-
                         } catch (e: Exception) {
-
                             Log.w(
                                 TAG,
                                 "Engine release warning",
@@ -184,15 +184,13 @@ class WakeWordService : Service() {
 
                         wakeWordEngine = null
 
-                        /*
-                         * Give Android time to release
-                         * the microphone before overlay work.
-                         */
                         delay(
                             MICROPHONE_HANDOFF_DELAY_MS
                         )
 
                         showVisionOverlay()
+
+                        startVoiceController()
                     }
 
                 } catch (e: Exception) {
@@ -245,22 +243,11 @@ class WakeWordService : Service() {
                         "Overlay permission is not granted"
                     )
 
-                    scheduleRestart()
+                    finishVoiceSession()
 
                     return@post
                 }
 
-                /*
-                 * IMPORTANT:
-                 *
-                 * Remove the previous overlay SYNCHRONOUSLY.
-                 *
-                 * The old implementation posted the removal
-                 * asynchronously, which could remove the NEW
-                 * overlay immediately after it was added.
-                 *
-                 * That caused the very fast blink.
-                 */
                 removeVisionOverlayNow()
 
                 val windowManager =
@@ -288,10 +275,13 @@ class WakeWordService : Service() {
                         dp(330),
                         dp(330),
 
-                        WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                        WindowManager.LayoutParams
+                            .TYPE_APPLICATION_OVERLAY,
 
-                        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+                        WindowManager.LayoutParams
+                            .FLAG_NOT_FOCUSABLE or
+                            WindowManager.LayoutParams
+                            .FLAG_NOT_TOUCH_MODAL,
 
                         PixelFormat.TRANSLUCENT
                     ).apply {
@@ -300,11 +290,8 @@ class WakeWordService : Service() {
                             Gravity.BOTTOM or
                                 Gravity.CENTER_HORIZONTAL
 
-                        y =
-                            dp(12)
-
+                        y = dp(12)
                         x = 0
-
                         alpha = 1.0f
                     }
 
@@ -313,19 +300,12 @@ class WakeWordService : Service() {
                     params
                 )
 
-                /*
-                 * Save the exact overlay references AFTER
-                 * successful addView().
-                 */
                 overlayWindowManager =
                     windowManager
 
                 overlayView =
                     container
 
-                /*
-                 * Wake screen if necessary.
-                 */
                 wakeScreenIfNeeded()
 
                 Log.d(
@@ -343,34 +323,172 @@ class WakeWordService : Service() {
 
                 removeVisionOverlayNow()
 
-                scheduleRestart()
+                finishVoiceSession()
             }
         }
     }
 
-    /*
-     * Public/internal overlay removal entry.
-     *
-     * This does NOT automatically remove the overlay.
-     *
-     * Future assistant controller can call this when the
-     * complete command has finished.
-     */
-    private fun removeVisionOverlay() {
+    private fun startVoiceController() {
 
         mainHandler.post {
 
-            removeVisionOverlayNow()
+            if (voiceActive) {
+                return@post
+            }
+
+            if (
+                ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.RECORD_AUDIO
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+
+                Log.w(
+                    TAG,
+                    "Microphone permission not granted"
+                )
+
+                finishVoiceSession()
+
+                return@post
+            }
+
+            voiceActive = true
+
+            Log.d(
+                TAG,
+                "Starting VisionVoiceController"
+            )
+
+            voiceController?.start(
+
+                onListening = {
+
+                    Log.d(
+                        TAG,
+                        "Vision voice: LISTENING"
+                    )
+                },
+
+                onThinking = {
+
+                    Log.d(
+                        TAG,
+                        "Vision voice: THINKING"
+                    )
+                },
+
+                onSpeaking = {
+
+                    Log.d(
+                        TAG,
+                        "Vision voice: SPEAKING"
+                    )
+                },
+
+                onConversation = { text ->
+
+                    Log.d(
+                        TAG,
+                        "Conversation input: $text"
+                    )
+
+                    /*
+                     * IMPORTANT:
+                     *
+                     * No "Ok Boss" is forced here.
+                     *
+                     * The actual semantic AI brain will be
+                     * connected in the next step.
+                     */
+                },
+
+                onCommand = { command ->
+
+                    Log.d(
+                        TAG,
+                        "Command input: $command"
+                    )
+
+                    /*
+                     * Command executor will be connected
+                     * after the semantic intent layer.
+                     */
+                },
+
+                onDismiss = {
+
+                    Log.d(
+                        TAG,
+                        "Voice session dismissed"
+                    )
+
+                    finishVoiceSession()
+                }
+            )
         }
     }
 
-    /*
-     * REAL synchronous removal.
-     *
-     * No nested Handler.post().
-     *
-     * This is the important fix for the blink problem.
-     */
+    private fun finishVoiceSession() {
+
+        mainHandler.post {
+
+            voiceActive = false
+
+            try {
+                voiceController?.stop()
+            } catch (e: Exception) {
+                Log.w(
+                    TAG,
+                    "Voice controller stop warning",
+                    e
+                )
+            }
+
+            removeVisionOverlayNow()
+
+            /*
+             * Return to passive wake-word listening.
+             */
+            if (!isDestroyed) {
+                restartWakeWordDetection()
+            }
+        }
+    }
+
+    private fun restartWakeWordDetection() {
+
+        mainHandler.post {
+
+            if (running || voiceActive) {
+                return@post
+            }
+
+            Log.d(
+                TAG,
+                "Returning to passive wake-word listening"
+            )
+
+            wakeWordEngine?.let { engine ->
+
+                try {
+                    engine.stop()
+                } catch (_: Exception) {
+                }
+
+                try {
+                    engine.release()
+                } catch (_: Exception) {
+                }
+            }
+
+            wakeWordEngine =
+                createWakeWordEngine()
+
+            startWakeWordDetection()
+        }
+    }
+
     private fun removeVisionOverlayNow() {
 
         val view =
@@ -379,13 +497,7 @@ class WakeWordService : Service() {
         val manager =
             overlayWindowManager
 
-        /*
-         * Clear references BEFORE removing the view.
-         *
-         * This prevents duplicate removal attempts.
-         */
         overlayView = null
-
         overlayWindowManager = null
 
         if (
@@ -412,7 +524,7 @@ class WakeWordService : Service() {
 
     private fun scheduleRestart() {
 
-        if (restarting) {
+        if (restarting || voiceActive) {
             return
         }
 
@@ -424,19 +536,15 @@ class WakeWordService : Service() {
                 RESTART_DELAY_MS
             )
 
-            if (!running) {
+            if (!running && !voiceActive) {
 
                 try {
-
                     wakeWordEngine?.stop()
-
                 } catch (_: Exception) {
                 }
 
                 try {
-
                     wakeWordEngine?.release()
-
                 } catch (_: Exception) {
                 }
 
@@ -505,19 +613,15 @@ class WakeWordService : Service() {
             val channel =
                 NotificationChannel(
                     NOTIFICATION_CHANNEL_ID,
-
                     "Vision Wake Word",
-
-                    NotificationManager
-                        .IMPORTANCE_LOW
+                    NotificationManager.IMPORTANCE_LOW
                 )
 
             getSystemService(
                 NotificationManager::class.java
+            ).createNotificationChannel(
+                channel
             )
-                .createNotificationChannel(
-                    channel
-                )
         }
     }
 
@@ -550,7 +654,7 @@ class WakeWordService : Service() {
                 resources
                     .displayMetrics
                     .density
-            ).toInt()
+        ).toInt()
     }
 
     override fun onTaskRemoved(
@@ -562,12 +666,6 @@ class WakeWordService : Service() {
             "App task removed — Wake Word service remains active"
         )
 
-        /*
-         * DO NOT stop the service here.
-         *
-         * The Activity can disappear from Recents while
-         * this foreground service continues running.
-         */
         super.onTaskRemoved(
             rootIntent
         )
@@ -582,6 +680,7 @@ class WakeWordService : Service() {
 
         running = false
         restarting = false
+        voiceActive = false
 
         detectionJob?.cancel()
         detectionJob = null
@@ -590,19 +689,29 @@ class WakeWordService : Service() {
             null
         )
 
+        try {
+            voiceController?.destroy()
+        } catch (_: Exception) {
+        }
+
+        voiceController = null
+
+        try {
+            ttsManager?.shutdown()
+        } catch (_: Exception) {
+        }
+
+        ttsManager = null
+
         removeVisionOverlayNow()
 
         try {
-
             wakeWordEngine?.stop()
-
         } catch (_: Exception) {
         }
 
         try {
-
             wakeWordEngine?.release()
-
         } catch (_: Exception) {
         }
 
@@ -616,7 +725,6 @@ class WakeWordService : Service() {
     override fun onBind(
         intent: Intent?
     ): IBinder? {
-
         return null
     }
 
