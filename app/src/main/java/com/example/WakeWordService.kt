@@ -52,6 +52,7 @@ class WakeWordService : Service() {
 
     private var voiceController: VisionVoiceController? = null
     private var ttsManager: GeminiTtsManager? = null
+    private var commandExecutor: VisionCommandExecutor? = null
 
     @Volatile
     private var running = false
@@ -69,6 +70,9 @@ class WakeWordService : Service() {
 
         ttsManager =
             GeminiTtsManager(this)
+
+        commandExecutor =
+            VisionCommandExecutor(this)
 
         voiceController =
             VisionVoiceController(
@@ -394,11 +398,11 @@ class WakeWordService : Service() {
                     )
 
                     /*
-                     * No "Ok Boss" is forced here.
+                     * Conversation/question/search
+                     * does NOT receive "Ok Boss".
                      *
-                     * The semantic AI brain will handle
-                     * conversation/question/action
-                     * classification in the next step.
+                     * Natural conversation handling will
+                     * be connected in the AI brain layer.
                      */
                 },
 
@@ -410,9 +414,84 @@ class WakeWordService : Service() {
                     )
 
                     /*
-                     * Command executor will be connected
-                     * after the semantic intent layer.
+                     * VisionVoiceController has already
+                     * classified this as ACTION and has
+                     * spoken "Ok Boss".
+                     *
+                     * Now execute the actual device action.
                      */
+
+                    serviceScope.launch {
+
+                        try {
+
+                            val executor =
+                                commandExecutor
+
+                            if (executor == null) {
+
+                                Log.e(
+                                    TAG,
+                                    "Command executor unavailable"
+                                )
+
+                                ttsManager?.speak(
+                                    "Boss, command executor available nahi hai."
+                                )
+
+                                delay(1500L)
+
+                                voiceController?.resumeListening()
+
+                                return@launch
+                            }
+
+                            val result =
+                                executor.execute(
+                                    command
+                                )
+
+                            Log.d(
+                                TAG,
+                                "Command execution result: " +
+                                    "success=${result.success}, " +
+                                    "action=${result.action}, " +
+                                    "message=${result.message}"
+                            )
+
+                            ttsManager?.speak(
+                                result.message
+                            )
+
+                            /*
+                             * Give TTS time to finish before
+                             * opening the microphone again.
+                             */
+                            delay(1500L)
+
+                            if (voiceActive) {
+                                voiceController?.resumeListening()
+                            }
+
+                        } catch (e: Exception) {
+
+                            Log.e(
+                                TAG,
+                                "Command execution failed",
+                                e
+                            )
+
+                            ttsManager?.speak(
+                                "Sorry Boss, command execute nahi ho paya."
+                            )
+
+                            delay(1500L)
+
+                            if (voiceActive) {
+                                voiceController?.resumeListening()
+                            }
+                        }
+                    }
                 },
 
                 onDismiss = {
@@ -704,6 +783,7 @@ class WakeWordService : Service() {
         }
 
         ttsManager = null
+        commandExecutor = null
 
         removeVisionOverlayNow()
 
