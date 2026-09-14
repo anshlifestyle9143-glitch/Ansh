@@ -58,6 +58,7 @@ import com.example.ui.viewmodel.VisionViewModel
 import com.example.util.LiveSpeechRecognizer
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.launch
 
 private enum class VoiceCallState {
@@ -155,16 +156,21 @@ fun VoiceConversationScreen(
                         )
 
                         /*
-                         * Wait until Ok Boss TTS actually starts.
+                         * TTS is asynchronous. Do not wait forever if the
+                         * Android TTS/Gemini TTS engine fails to start.
+                         * If it starts, wait for the normal completion.
                          */
-                        viewModel.ttsManager.isSpeaking
-                            .first { it }
+                        val okBossStarted =
+                            withTimeoutOrNull(3000L) {
+                                viewModel.ttsManager.isSpeaking.first { it }
+                                true
+                            } == true
 
-                        /*
-                         * Wait until Ok Boss TTS completely finishes.
-                         */
-                        viewModel.ttsManager.isSpeaking
-                            .first { !it }
+                        if (okBossStarted) {
+                            withTimeoutOrNull(10000L) {
+                                viewModel.ttsManager.isSpeaking.first { !it }
+                            }
+                        }
 
                         if (!active) return@launch
 
@@ -201,18 +207,11 @@ fun VoiceConversationScreen(
                 } else {
 
                     /*
-                     * IMPORTANT:
-                     *
-                     * onEndOfSpeech() does NOT mean that the final
-                     * recognition result has arrived.
-                     *
-                     * SpeechRecognizer normally calls onResults()
-                     * after onEndOfSpeech().
-                     *
-                     * Therefore we intentionally DO NOT change
-                     * LISTENING -> THINKING here.
-                     *
-                     * The final command is handled only by onFinal().
+                     * SpeechRecognizer may report onEndOfSpeech before
+                     * onResults. Do not change LISTENING -> THINKING here;
+                     * the final callback is responsible for command flow.
+                     * This prevents a state race while the recognizer is
+                     * still preparing the final result.
                      */
                 }
             },
@@ -300,20 +299,24 @@ fun VoiceConversationScreen(
         )
 
         /*
-         * Wait until Yes Boss TTS actually starts.
+         * Never block the voice flow forever if TTS does not start.
+         * When TTS starts normally, wait for it to finish.
          */
-        viewModel.ttsManager.isSpeaking
-            .first { it }
+        val yesBossStarted =
+            withTimeoutOrNull(3000L) {
+                viewModel.ttsManager.isSpeaking.first { it }
+                true
+            } == true
+
+        if (yesBossStarted) {
+            withTimeoutOrNull(10000L) {
+                viewModel.ttsManager.isSpeaking.first { !it }
+            }
+        }
 
         /*
-         * Wait until Yes Boss TTS finishes.
-         */
-        viewModel.ttsManager.isSpeaking
-            .first { !it }
-
-        /*
-         * Safety gap between TTS releasing the audio path
-         * and SpeechRecognizer acquiring the microphone.
+         * Small safety gap before microphone starts.
+         * Kept at 400ms to give TTS time to release audio focus.
          */
         delay(400L)
 
@@ -345,9 +348,6 @@ fun VoiceConversationScreen(
     /*
      * =============================================================
      * TTS STATE
-     *
-     * During speech microphone stays OFF.
-     * After response speech ends, listening resumes.
      * =============================================================
      */
     LaunchedEffect(isSpeaking) {
@@ -356,36 +356,35 @@ fun VoiceConversationScreen(
 
         if (isSpeaking) {
 
-            listeningStarted = false
-
-            callState =
-                VoiceCallState.SPEAKING
-
-            speechRecognizer.stop()
-
-        } else if (
-            callState ==
-                VoiceCallState.SPEAKING
-        ) {
-
-            delay(350L)
-
             if (
-                active &&
-                !isGenerating
+                callState !=
+                    VoiceCallState.LISTENING
             ) {
 
-                requestListening()
+                callState =
+                    VoiceCallState.SPEAKING
+            }
+
+        } else {
+
+            if (
+                !isGenerating &&
+                callState ==
+                    VoiceCallState.SPEAKING
+            ) {
+
+                callState =
+                    VoiceCallState.IDLE
             }
         }
     }
 
     /*
      * =============================================================
-     * THINKING → LISTENING
+     * AFTER AI RESPONSE
      *
-     * After AI processing completes without TTS,
-     * listening can resume.
+     * When Vision finishes speaking, return to listening so the user
+     * can give another command.
      * =============================================================
      */
     LaunchedEffect(
@@ -402,14 +401,9 @@ fun VoiceConversationScreen(
                 VoiceCallState.THINKING
         ) {
 
-            delay(350L)
+            delay(300L)
 
-            if (
-                active &&
-                !isGenerating &&
-                !isSpeaking
-            ) {
-
+            if (active) {
                 requestListening()
             }
         }
@@ -417,258 +411,361 @@ fun VoiceConversationScreen(
 
     /*
      * =============================================================
-     * VOICE ORB ANIMATION
+     * ANIMATION
      * =============================================================
      */
     val infiniteTransition =
         rememberInfiniteTransition(
-            label = "voiceOrb"
+            label = "voice_pulse"
         )
 
-    val pulseScale by
+    val pulse by
         infiniteTransition.animateFloat(
-            initialValue = 1f,
-            targetValue = 1.12f,
+            initialValue = 0.94f,
+            targetValue = 1.06f,
             animationSpec =
                 infiniteRepeatable(
                     animation =
                         tween(
-                            durationMillis = 1100
+                            durationMillis = 900
                         ),
                     repeatMode =
                         RepeatMode.Reverse
                 ),
-            label = "pulseScale"
+            label = "pulse"
         )
 
-    val glowAlpha by
-        infiniteTransition.animateFloat(
-            initialValue = 0.25f,
-            targetValue = 0.55f,
-            animationSpec =
-                infiniteRepeatable(
-                    animation =
-                        tween(
-                            durationMillis = 1100
-                        ),
-                    repeatMode =
-                        RepeatMode.Reverse
-                ),
-            label = "glowAlpha"
-        )
+    val orbColor =
+        when (callState) {
+
+            VoiceCallState.LISTENING ->
+                VisionDeepPlum
+
+            VoiceCallState.THINKING ->
+                VisionEmerald
+
+            VoiceCallState.SPEAKING ->
+                VisionIndigo
+
+            VoiceCallState.IDLE,
+            VoiceCallState.NO_PERMISSION ->
+                VisionDeepPlum.copy(
+                    alpha = 0.5f
+                )
+        }
 
     Box(
         modifier =
             Modifier
                 .fillMaxSize()
                 .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            VisionBackground,
-                            VisionDeepPlum
-                        )
-                    )
+                    VisionBackground
                 )
     ) {
 
+        /*
+         * =========================================================
+         * EXISTING VOICE ORB
+         * =========================================================
+         */
         Column(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .padding(20.dp),
+                    .padding(
+                        bottom = 170.dp
+                    ),
             horizontalAlignment =
-                Alignment.CenterHorizontally
+                Alignment.CenterHorizontally,
+            verticalArrangement =
+                Arrangement.Center
         ) {
-
-            Row(
-                modifier =
-                    Modifier.fillMaxWidth(),
-                horizontalArrangement =
-                    Arrangement.End
-            ) {
-
-                IconButton(
-                    onClick = onExit
-                ) {
-
-                    Icon(
-                        imageVector =
-                            Icons.Default.Close,
-                        contentDescription =
-                            "Close",
-                        tint =
-                            VisionTextPrimary
-                    )
-                }
-            }
-
-            Spacer(
-                modifier =
-                    Modifier.height(50.dp)
-            )
 
             Box(
                 modifier =
                     Modifier
-                        .size(230.dp)
+                        .size(180.dp)
                         .graphicsLayer {
-                            scaleX =
+
+                            val scale =
                                 if (
                                     callState ==
-                                        VoiceCallState.LISTENING
+                                        VoiceCallState.IDLE ||
+                                    callState ==
+                                        VoiceCallState.NO_PERMISSION
                                 ) {
-                                    pulseScale
-                                } else {
                                     1f
+                                } else {
+                                    pulse
                                 }
 
-                            scaleY =
-                                if (
-                                    callState ==
-                                        VoiceCallState.LISTENING
-                                ) {
-                                    pulseScale
-                                } else {
-                                    1f
-                                }
-
-                            alpha =
-                                if (
-                                    callState ==
-                                        VoiceCallState.LISTENING
-                                ) {
-                                    glowAlpha
-                                } else {
-                                    1f
-                                }
+                            scaleX = scale
+                            scaleY = scale
                         }
                         .clip(CircleShape)
                         .background(
                             Brush.radialGradient(
-                                listOf(
-                                    VisionIndigo,
-                                    VisionEmerald
-                                )
+                                colors =
+                                    listOf(
+                                        orbColor,
+                                        orbColor.copy(
+                                            alpha = 0.15f
+                                        )
+                                    )
                             )
-                        ),
-                contentAlignment =
-                    Alignment.Center
-            ) {
-
-                Icon(
-                    imageVector =
-                        Icons.Default.Mic,
-                    contentDescription =
-                        "Voice",
-                    tint =
-                        Color.White,
-                    modifier =
-                        Modifier.size(70.dp)
-                )
-            }
+                        )
+            )
 
             Spacer(
                 modifier =
-                    Modifier.height(35.dp)
+                    Modifier.height(28.dp)
             )
 
             Text(
                 text =
                     when (callState) {
+
+                        VoiceCallState.LISTENING ->
+                            "Sun rahi hoon..."
+
+                        VoiceCallState.THINKING ->
+                            "Soch rahi hoon..."
+
+                        VoiceCallState.SPEAKING ->
+                            "Bol rahi hoon..."
 
                         VoiceCallState.IDLE ->
-                            "Ready"
-
-                        VoiceCallState.LISTENING ->
-                            "Listening..."
-
-                        VoiceCallState.THINKING ->
-                            "Thinking..."
-
-                        VoiceCallState.SPEAKING ->
-                            "Speaking..."
+                            "Bolne ke liye mic dabao"
 
                         VoiceCallState.NO_PERMISSION ->
-                            "Microphone permission required"
+                            "Mic permission chahiye — settings me allow karo"
                     },
-                color =
-                    VisionTextPrimary,
-                fontSize =
-                    22.sp
-            )
 
-            Spacer(
-                modifier =
-                    Modifier.height(12.dp)
-            )
-
-            Text(
-                text =
-                    when (callState) {
-
-                        VoiceCallState.LISTENING ->
-                            "Tell me what you need"
-
-                        VoiceCallState.THINKING ->
-                            "Processing your command"
-
-                        VoiceCallState.SPEAKING ->
-                            "Vision is speaking"
-
-                        VoiceCallState.NO_PERMISSION ->
-                            "Please allow microphone access"
-
-                        else ->
-                            "Vision Voice Assistant"
-                    },
                 color =
                     VisionTextSecondary,
+
                 fontSize =
-                    15.sp
+                    14.sp
             )
+        }
 
-            Spacer(
-                modifier =
-                    Modifier.height(40.dp)
+        /*
+         * =========================================================
+         * CLOSE BUTTON
+         * =========================================================
+         */
+        IconButton(
+            onClick = {
+
+                active = false
+                listeningStarted = false
+
+                speechRecognizer.stop()
+                speechRecognizer.destroy()
+
+                onExit()
+            },
+
+            modifier =
+                Modifier
+                    .align(
+                        Alignment.TopStart
+                    )
+                    .padding(20.dp)
+        ) {
+
+            Icon(
+                Icons.Default.Close,
+                contentDescription =
+                    "End call",
+                tint =
+                    VisionTextPrimary
             )
+        }
 
-            Surface(
+        /*
+         * =========================================================
+         * VISION BOTTOM POPUP
+         * =========================================================
+         */
+        Surface(
+            modifier =
+                Modifier
+                    .align(
+                        Alignment.BottomCenter
+                    )
+                    .fillMaxWidth()
+                    .padding(
+                        start = 16.dp,
+                        end = 16.dp,
+                        bottom = 20.dp
+                    ),
+
+            shape =
+                RoundedCornerShape(
+                    28.dp
+                ),
+
+            color =
+                VisionDeepPlum.copy(
+                    alpha = 0.96f
+                ),
+
+            tonalElevation =
+                8.dp,
+
+            shadowElevation =
+                12.dp
+        ) {
+
+            Column(
                 modifier =
-                    Modifier.fillMaxWidth(),
-                shape =
-                    RoundedCornerShape(22.dp),
-                color =
-                    Color.White.copy(alpha = 0.08f)
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            horizontal = 20.dp,
+                            vertical = 16.dp
+                        )
             ) {
 
-                Column(
+                Row(
                     modifier =
-                        Modifier.padding(20.dp)
+                        Modifier.fillMaxWidth(),
+                    verticalAlignment =
+                        Alignment.CenterVertically
                 ) {
 
-                    Text(
-                        text =
-                            "Voice Mode",
-                        color =
-                            VisionTextPrimary,
-                        fontSize =
-                            17.sp
-                    )
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(42.dp)
+                                .clip(
+                                    CircleShape
+                                )
+                                .background(
+                                    orbColor
+                                ),
+                        contentAlignment =
+                            Alignment.Center
+                    ) {
+
+                        Icon(
+                            Icons.Default.Mic,
+                            contentDescription =
+                                "Vision microphone",
+                            tint =
+                                Color.White,
+                            modifier =
+                                Modifier.size(21.dp)
+                        )
+                    }
 
                     Spacer(
                         modifier =
-                            Modifier.height(8.dp)
+                            Modifier.size(14.dp)
                     )
 
-                    Text(
-                        text =
-                            "Say \"Hey Jarvis\" to activate Vision.",
-                        color =
-                            VisionTextSecondary,
-                        fontSize =
-                            14.sp
-                    )
+                    Column(
+                        modifier =
+                            Modifier.weight(1f)
+                    ) {
+
+                        Text(
+                            text = "VISION",
+                            color =
+                                VisionTextPrimary,
+                            fontSize =
+                                16.sp
+                        )
+
+                        Spacer(
+                            modifier =
+                                Modifier.height(2.dp)
+                        )
+
+                        Text(
+                            text =
+                                when (callState) {
+
+                                    VoiceCallState.LISTENING ->
+                                        "Listening..."
+
+                                    VoiceCallState.THINKING ->
+                                        "Processing..."
+
+                                    VoiceCallState.SPEAKING ->
+                                        "Speaking..."
+
+                                    VoiceCallState.IDLE ->
+                                        "Ready"
+
+                                    VoiceCallState.NO_PERMISSION ->
+                                        "Microphone permission required"
+                                },
+
+                            color =
+                                VisionTextSecondary,
+
+                            fontSize =
+                                13.sp
+                        )
+                    }
+
+                    if (
+                        callState ==
+                            VoiceCallState.IDLE ||
+                        callState ==
+                            VoiceCallState.NO_PERMISSION
+                    ) {
+
+                        IconButton(
+                            onClick = {
+                                requestListening()
+                            }
+                        ) {
+
+                            Icon(
+                                Icons.Default.Mic,
+                                contentDescription =
+                                    "Start listening",
+                                tint =
+                                    Color.White
+                            )
+                        }
+                    }
                 }
+
+                Spacer(
+                    modifier =
+                        Modifier.height(10.dp)
+                )
+
+                Text(
+                    text =
+                        when (callState) {
+
+                            VoiceCallState.LISTENING ->
+                                "I'm listening for your command"
+
+                            VoiceCallState.THINKING ->
+                                "Working on your command..."
+
+                            VoiceCallState.SPEAKING ->
+                                "Vision is responding..."
+
+                            VoiceCallState.IDLE ->
+                                "Tap the microphone to speak"
+
+                            VoiceCallState.NO_PERMISSION ->
+                                "Allow microphone access to continue"
+                        },
+
+                    color =
+                        VisionTextSecondary,
+
+                    fontSize =
+                        12.sp
+                )
             }
         }
     }
