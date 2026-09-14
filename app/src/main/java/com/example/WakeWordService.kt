@@ -21,6 +21,9 @@ import android.view.WindowManager
 import android.widget.FrameLayout
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import com.example.data.VisionDatabase
+import com.example.data.VisionRepository
+import com.example.util.AiEngineType
 import com.example.util.GeminiTtsManager
 import com.rementia.openwakeword.lib.WakeWordEngine
 import com.rementia.openwakeword.lib.model.DetectionMode
@@ -53,6 +56,9 @@ class WakeWordService : Service() {
     private var voiceController: VisionVoiceController? = null
     private var ttsManager: GeminiTtsManager? = null
 
+    private var voiceRepository: VisionRepository? = null
+    private var voiceSessionId: Long? = null
+
     @Volatile
     private var running = false
 
@@ -74,6 +80,17 @@ class WakeWordService : Service() {
             VisionVoiceController(
                 context = this,
                 ttsManager = ttsManager!!
+            )
+
+        val database =
+            VisionDatabase.getDatabase(
+                this,
+                serviceScope
+            )
+
+        voiceRepository =
+            VisionRepository(
+                database.visionDao()
             )
 
         wakeWordEngine =
@@ -129,7 +146,6 @@ class WakeWordService : Service() {
         val engine =
             wakeWordEngine
                 ?: run {
-
                     wakeWordEngine =
                         createWakeWordEngine()
 
@@ -149,7 +165,10 @@ class WakeWordService : Service() {
 
                     engine.detections.collect { detection ->
 
-                        if (!running || voiceActive) {
+                        if (
+                            !running ||
+                            voiceActive
+                        ) {
                             return@collect
                         }
 
@@ -236,7 +255,9 @@ class WakeWordService : Service() {
 
             try {
 
-                if (!Settings.canDrawOverlays(this)) {
+                if (
+                    !Settings.canDrawOverlays(this)
+                ) {
 
                     Log.w(
                         TAG,
@@ -355,6 +376,8 @@ class WakeWordService : Service() {
 
             voiceActive = true
 
+            voiceSessionId = null
+
             Log.d(
                 TAG,
                 "Starting VisionVoiceController"
@@ -393,13 +416,9 @@ class WakeWordService : Service() {
                         "Conversation input: $text"
                     )
 
-                    /*
-                     * No "Ok Boss" is forced here.
-                     *
-                     * The semantic AI brain will handle
-                     * conversation/question/action
-                     * classification in the next step.
-                     */
+                    handleVoiceText(
+                        text
+                    )
                 },
 
                 onCommand = { command ->
@@ -410,9 +429,15 @@ class WakeWordService : Service() {
                     )
 
                     /*
-                     * Command executor will be connected
-                     * after the semantic intent layer.
+                     * For now the semantic ACTION is
+                     * passed into the Vision brain.
+                     *
+                     * The real device-action executor
+                     * will be connected in the next step.
                      */
+                    handleVoiceText(
+                        command
+                    )
                 },
 
                 onDismiss = {
@@ -428,11 +453,168 @@ class WakeWordService : Service() {
         }
     }
 
+    private fun handleVoiceText(
+        text: String
+    ) {
+
+        val cleanText =
+            text.trim()
+
+        if (
+            cleanText.isBlank() ||
+            !voiceActive
+        ) {
+            return
+        }
+
+        serviceScope.launch {
+
+            try {
+
+                val repository =
+                    voiceRepository
+                        ?: return@launch
+
+                val sessionId =
+                    voiceSessionId
+                        ?: repository
+                            .createNewSession(
+                                title = "Voice Session"
+                            )
+                            .also {
+                                voiceSessionId = it
+                            }
+
+                Log.d(
+                    TAG,
+                    "Sending voice input to Vision Core: $cleanText"
+                )
+
+                val result =
+                    repository.sendMessage(
+                        sessionId = sessionId,
+                        userPrompt = cleanText,
+                        engineType =
+                            AiEngineType.VISION_CORE
+                    )
+
+                if (!voiceActive) {
+                    return@launch
+                }
+
+                result
+                    .onSuccess { message ->
+
+                        val response =
+                            message.content
+                                .trim()
+
+                        if (
+                            response.isNotBlank() &&
+                            voiceActive
+                        ) {
+
+                            mainHandler.post {
+
+                                if (!voiceActive) {
+                                    return@post
+                                }
+
+                                serviceScope.launch {
+
+                                    speakVoiceResponse(
+                                        response
+                                    )
+                                }
+                            }
+
+                        } else {
+
+                            resumeVoiceListening()
+                        }
+                    }
+                    .onFailure { error ->
+
+                        Log.e(
+                            TAG,
+                            "Voice AI request failed",
+                            error
+                        )
+
+                        resumeVoiceListening()
+                    }
+
+            } catch (e: Exception) {
+
+                Log.e(
+                    TAG,
+                    "Voice text handling failed",
+                    e
+                )
+
+                resumeVoiceListening()
+            }
+        }
+    }
+
+    private suspend fun speakVoiceResponse(
+        response: String
+    ) {
+
+        if (!voiceActive) {
+            return
+        }
+
+        val tts =
+            ttsManager
+                ?: return
+
+        Log.d(
+            TAG,
+            "Vision response: $response"
+        )
+
+        tts.speak(
+            response,
+            -System.currentTimeMillis()
+        )
+
+        delay(
+            RESPONSE_SPEAK_WAIT_MS
+        )
+
+        if (!voiceActive) {
+            return
+        }
+
+        resumeVoiceListening()
+    }
+
+    private fun resumeVoiceListening() {
+
+        mainHandler.post {
+
+            if (!voiceActive) {
+                return@post
+            }
+
+            Log.d(
+                TAG,
+                "Resuming voice listening"
+            )
+
+            voiceController?.resumeListening(
+                VOICE_RESUME_DELAY_MS
+            )
+        }
+    }
+
     private fun finishVoiceSession() {
 
         mainHandler.post {
 
             voiceActive = false
+            voiceSessionId = null
 
             try {
                 voiceController?.stop()
@@ -446,12 +628,6 @@ class WakeWordService : Service() {
 
             removeVisionOverlayNow()
 
-            /*
-             * Return to passive wake-word listening.
-             *
-             * Service has no isDestroyed property,
-             * so voiceActive is used as the lifecycle guard.
-             */
             if (!voiceActive) {
                 restartWakeWordDetection()
             }
@@ -462,7 +638,10 @@ class WakeWordService : Service() {
 
         mainHandler.post {
 
-            if (running || voiceActive) {
+            if (
+                running ||
+                voiceActive
+            ) {
                 return@post
             }
 
@@ -526,7 +705,10 @@ class WakeWordService : Service() {
 
     private fun scheduleRestart() {
 
-        if (restarting || voiceActive) {
+        if (
+            restarting ||
+            voiceActive
+        ) {
             return
         }
 
@@ -538,7 +720,10 @@ class WakeWordService : Service() {
                 RESTART_DELAY_MS
             )
 
-            if (!running && !voiceActive) {
+            if (
+                !running &&
+                !voiceActive
+            ) {
 
                 try {
                     wakeWordEngine?.stop()
@@ -579,8 +764,10 @@ class WakeWordService : Service() {
                 val wakeLock =
                     powerManager.newWakeLock(
 
-                        PowerManager.SCREEN_BRIGHT_WAKE_LOCK or
-                            PowerManager.ACQUIRE_CAUSES_WAKEUP,
+                        PowerManager
+                            .SCREEN_BRIGHT_WAKE_LOCK or
+                            PowerManager
+                            .ACQUIRE_CAUSES_WAKEUP,
 
                         "Vision::WakeWordScreen"
                     )
@@ -656,7 +843,7 @@ class WakeWordService : Service() {
                 resources
                     .displayMetrics
                     .density
-        ).toInt()
+            ).toInt()
     }
 
     override fun onTaskRemoved(
@@ -683,6 +870,7 @@ class WakeWordService : Service() {
         running = false
         restarting = false
         voiceActive = false
+        voiceSessionId = null
 
         detectionJob?.cancel()
         detectionJob = null
@@ -704,6 +892,7 @@ class WakeWordService : Service() {
         }
 
         ttsManager = null
+        voiceRepository = null
 
         removeVisionOverlayNow()
 
@@ -749,5 +938,11 @@ class WakeWordService : Service() {
 
         private const val SCREEN_WAKE_DURATION_MS =
             3000L
+
+        private const val VOICE_RESUME_DELAY_MS =
+            350L
+
+        private const val RESPONSE_SPEAK_WAIT_MS =
+            1200L
     }
 }
