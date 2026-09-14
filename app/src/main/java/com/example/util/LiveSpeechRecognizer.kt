@@ -110,14 +110,6 @@ class LiveSpeechRecognizer(private val context: Context) {
 
                         onListeningChange(false)
 
-                        /*
-                         * IMPORTANT:
-                         * Final result means the current recognition
-                         * session is finished.
-                         *
-                         * Stop the recognizer immediately so it cannot
-                         * restart while the AI is processing/TTS is speaking.
-                         */
                         try {
                             recognizer?.stopListening()
                         } catch (_: Exception) {
@@ -126,14 +118,6 @@ class LiveSpeechRecognizer(private val context: Context) {
                         if (!text.isNullOrBlank()) {
                             onFinal(text)
                         }
-
-                        /*
-                         * Do NOT restart here.
-                         *
-                         * VoiceConversationScreen will decide when the
-                         * next listening session should begin after the
-                         * AI/TTS flow is finished.
-                         */
                     }
 
                     override fun onPartialResults(
@@ -186,22 +170,30 @@ class LiveSpeechRecognizer(private val context: Context) {
                     context.packageName
                 )
 
+                /*
+                 * Command complete hone ke baad
+                 * lagbhag 1.5 second silence par
+                 * final result generate hoga.
+                 */
                 putExtra(
                     RecognizerIntent
                         .EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS,
-                    60000L
+                    1500L
                 )
 
                 putExtra(
                     RecognizerIntent
                         .EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS,
-                    60000L
+                    1500L
                 )
 
+                /*
+                 * Minimum listening duration.
+                 */
                 putExtra(
                     RecognizerIntent
                         .EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS,
-                    60000L
+                    1500L
                 )
             }
 
