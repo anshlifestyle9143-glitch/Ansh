@@ -394,12 +394,11 @@ class WakeWordService : Service() {
                     )
 
                     /*
-                     * IMPORTANT:
-                     *
                      * No "Ok Boss" is forced here.
                      *
-                     * The actual semantic AI brain will be
-                     * connected in the next step.
+                     * The semantic AI brain will handle
+                     * conversation/question/action
+                     * classification in the next step.
                      */
                 },
 
@@ -449,8 +448,11 @@ class WakeWordService : Service() {
 
             /*
              * Return to passive wake-word listening.
+             *
+             * Service has no isDestroyed property,
+             * so voiceActive is used as the lifecycle guard.
              */
-            if (!isDestroyed) {
+            if (!voiceActive) {
                 restartWakeWordDetection()
             }
         }
