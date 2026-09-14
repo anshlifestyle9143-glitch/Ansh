@@ -52,6 +52,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         handleIntent(intent)
+        openOverlayPermissionSettings()
 
         setContent {
             VisionTheme {
