@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
 import android.os.IBinder
+import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.example.MainActivity
@@ -95,7 +96,9 @@ class WakeWordService : Service() {
                 launch {
                     engine.detections.collect { detection ->
 
-                        if (!running) return@collect
+                        if (!running) {
+                            return@collect
+                        }
 
                         Log.d(
                             TAG,
@@ -121,6 +124,7 @@ class WakeWordService : Service() {
                 }
 
                 try {
+
                     engine.start()
 
                     Log.d(
@@ -189,24 +193,36 @@ class WakeWordService : Service() {
 
         try {
 
-            val intent = Intent(
-                this,
-                MainActivity::class.java
-            ).apply {
+            /*
+             * Request the screen to wake before opening Vision.
+             * This is especially useful when the phone is sleeping.
+             */
+            wakeScreenIfNeeded()
 
-                addFlags(
-                    Intent.FLAG_ACTIVITY_NEW_TASK or
-                            Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                            Intent.FLAG_ACTIVITY_SINGLE_TOP
-                )
+            val intent =
+                Intent(
+                    this,
+                    MainActivity::class.java
+                ).apply {
 
-                putExtra(
-                    MainActivity.EXTRA_OPEN_VOICE_CALL,
-                    true
-                )
-            }
+                    addFlags(
+                        Intent.FLAG_ACTIVITY_NEW_TASK or
+                                Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                                Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    )
+
+                    putExtra(
+                        MainActivity.EXTRA_OPEN_VOICE_CALL,
+                        true
+                    )
+                }
 
             startActivity(intent)
+
+            Log.d(
+                TAG,
+                "Voice activity launch requested"
+            )
 
         } catch (e: Exception) {
 
@@ -220,19 +236,60 @@ class WakeWordService : Service() {
         }
     }
 
+    private fun wakeScreenIfNeeded() {
+
+        try {
+
+            val powerManager =
+                getSystemService(
+                    POWER_SERVICE
+                ) as PowerManager
+
+            if (!powerManager.isInteractive) {
+
+                @Suppress("DEPRECATION")
+                val wakeLock =
+                    powerManager.newWakeLock(
+                        PowerManager.SCREEN_BRIGHT_WAKE_LOCK or
+                                PowerManager.ACQUIRE_CAUSES_WAKEUP,
+                        "$TAG:WakeLock"
+                    )
+
+                wakeLock.acquire(
+                    SCREEN_WAKE_DURATION_MS
+                )
+
+                Log.d(
+                    TAG,
+                    "Screen wake requested"
+                )
+            }
+
+        } catch (e: Exception) {
+
+            Log.w(
+                TAG,
+                "Unable to wake screen",
+                e
+            )
+        }
+    }
+
     private fun buildNotification(): Notification {
 
         val channelId = "vision_wake_word"
 
-        if (android.os.Build.VERSION.SDK_INT >=
+        if (
+            android.os.Build.VERSION.SDK_INT >=
             android.os.Build.VERSION_CODES.O
         ) {
 
-            val channel = NotificationChannel(
-                channelId,
-                "Vision Wake Word",
-                NotificationManager.IMPORTANCE_LOW
-            )
+            val channel =
+                NotificationChannel(
+                    channelId,
+                    "Vision Wake Word",
+                    NotificationManager.IMPORTANCE_LOW
+                )
 
             getSystemService(
                 NotificationManager::class.java
@@ -243,7 +300,9 @@ class WakeWordService : Service() {
             this,
             channelId
         )
-            .setContentTitle("Vision is listening")
+            .setContentTitle(
+                "Vision is listening"
+            )
             .setContentText(
                 "Say \"Hey Jarvis\" to start talking"
             )
@@ -279,14 +338,22 @@ class WakeWordService : Service() {
         super.onDestroy()
     }
 
-    override fun onBind(intent: Intent?): IBinder? = null
+    override fun onBind(
+        intent: Intent?
+    ): IBinder? = null
 
     companion object {
 
-        private const val TAG = "VisionWakeWord"
+        private const val TAG =
+            "VisionWakeWord"
 
-        private const val NOTIFICATION_ID = 4201
+        private const val NOTIFICATION_ID =
+            4201
 
-        private const val RESTART_DELAY_MS = 1500L
+        private const val RESTART_DELAY_MS =
+            1500L
+
+        private const val SCREEN_WAKE_DURATION_MS =
+            3000L
     }
 }
