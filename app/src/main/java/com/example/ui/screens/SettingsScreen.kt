@@ -2,7 +2,6 @@ package com.example.ui.screens
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -16,7 +15,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Memory
@@ -52,7 +50,6 @@ import com.example.ui.viewmodel.VisionViewModel
 fun SettingsScreen(
     viewModel: VisionViewModel,
     onBack: () -> Unit,
-    onOpenEngines: () -> Unit,
     onOpenMemory: () -> Unit,
     onOpenVisionInfo: () -> Unit,
     modifier: Modifier = Modifier
@@ -119,7 +116,10 @@ fun SettingsScreen(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
             color = VisionCardBg,
-            border = BorderStroke(1.dp, VisionCardBorder.copy(alpha = 0.8f)),
+            border = BorderStroke(
+                1.dp,
+                VisionCardBorder.copy(alpha = 0.8f)
+            ),
             shadowElevation = 2.dp
         ) {
             Row(
@@ -129,7 +129,9 @@ fun SettingsScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Surface(
                         modifier = Modifier.size(44.dp),
                         shape = RoundedCornerShape(12.dp),
@@ -139,7 +141,9 @@ fun SettingsScreen(
                             imageVector = Icons.Default.Mic,
                             contentDescription = "Wake Word",
                             tint = Color.White,
-                            modifier = Modifier.padding(10.dp).size(22.dp)
+                            modifier = Modifier
+                                .padding(10.dp)
+                                .size(22.dp)
                         )
                     }
 
@@ -152,7 +156,9 @@ fun SettingsScreen(
                             fontWeight = FontWeight.Bold,
                             color = VisionDeepPlum
                         )
+
                         Spacer(modifier = Modifier.height(3.dp))
+
                         Text(
                             text = "Say \"Hey Vision\" anytime, even screen off",
                             style = MaterialTheme.typography.bodySmall,
@@ -163,7 +169,9 @@ fun SettingsScreen(
 
                 Switch(
                     checked = wakeWordEnabled,
-                    onCheckedChange = { viewModel.setWakeWordEnabled(it) }
+                    onCheckedChange = {
+                        viewModel.setWakeWordEnabled(it)
+                    }
                 )
             }
         }
@@ -178,15 +186,6 @@ fun SettingsScreen(
             color = VisionPrimaryPurple,
             modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
         )
-
-        SettingsItem(
-            icon = Icons.Default.AutoAwesome,
-            title = "AI Engines",
-            subtitle = "Manage and switch Vision neural engines",
-            onClick = onOpenEngines
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
 
         SettingsItem(
             icon = Icons.Default.Memory,
@@ -220,11 +219,17 @@ private fun SettingsItem(
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
         color = VisionCardBg,
-        border = BorderStroke(1.dp, VisionCardBorder.copy(alpha = 0.8f)),
+        border = BorderStroke(
+            1.dp,
+            VisionCardBorder.copy(alpha = 0.8f)
+        ),
         shadowElevation = 2.dp
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 15.dp),
+            modifier = Modifier.padding(
+                horizontal = 16.dp,
+                vertical = 15.dp
+            ),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Surface(
@@ -236,20 +241,26 @@ private fun SettingsItem(
                     imageVector = icon,
                     contentDescription = title,
                     tint = Color.White,
-                    modifier = Modifier.padding(10.dp).size(22.dp)
+                    modifier = Modifier
+                        .padding(10.dp)
+                        .size(22.dp)
                 )
             }
 
             Spacer(modifier = Modifier.width(14.dp))
 
-            Column(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = VisionDeepPlum
                 )
+
                 Spacer(modifier = Modifier.height(3.dp))
+
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
