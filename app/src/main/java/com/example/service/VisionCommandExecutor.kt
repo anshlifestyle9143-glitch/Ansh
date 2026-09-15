@@ -113,7 +113,7 @@ class VisionCommandExecutor(
         text: String
     ): ParsedCommand = withContext(Dispatchers.IO) {
 
-        val apiKey = VisionRetrofitClient.getApiKey()
+        val apiKey = VisionRetrofitClient.getCommandApiKey()
 
         if (
             apiKey.isBlank() ||
