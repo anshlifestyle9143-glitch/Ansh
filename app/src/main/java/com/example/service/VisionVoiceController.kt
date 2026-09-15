@@ -5,7 +5,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.util.Log
 import androidx.core.content.ContextCompat
-import com.example.util.GeminiTtsManager
+import com.example.util.TtsManager
 import com.example.util.LiveSpeechRecognizer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -18,7 +18,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 class VisionVoiceController(
     private val context: Context,
-    private val ttsManager: GeminiTtsManager
+    private val ttsManager: TtsManager
 ) {
 
     companion object {
