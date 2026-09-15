@@ -34,7 +34,7 @@ class VisionCommandExecutor(
 
     companion object {
         private const val TAG = "VisionCommandExecutor"
-        private const val MODEL = "gemini-3.5-flash"
+        private const val MODEL = "gemini-3.5-flash-lite"
 
         private const val FLASHLIGHT = "FLASHLIGHT"
         private const val ON = "ON"
