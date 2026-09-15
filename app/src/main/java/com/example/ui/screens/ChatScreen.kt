@@ -27,6 +27,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -41,7 +42,9 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -63,6 +66,7 @@ import com.example.ui.theme.VisionCardBorder
 import com.example.ui.theme.VisionDeepPlum
 import com.example.ui.theme.VisionLilacPill
 import com.example.ui.theme.VisionPrimaryPurple
+import com.example.ui.theme.VisionRose
 import com.example.ui.theme.VisionTextMuted
 import com.example.ui.theme.VisionTextPrimary
 import com.example.ui.theme.VisionTextSecondary
@@ -92,6 +96,8 @@ fun ChatScreen(
         LiveSpeechRecognizer(context)
     }
 
+    var isListening by remember { mutableStateOf(false) }
+
     DisposableEffect(Unit) {
         onDispose {
             speechRecognizer.destroy()
@@ -99,6 +105,7 @@ fun ChatScreen(
     }
 
     fun startListening() {
+        isListening = true
         speechRecognizer.start(
             onPartial = { text ->
                 viewModel.onUserInputChange(text)
@@ -106,9 +113,22 @@ fun ChatScreen(
             onFinal = { text ->
                 viewModel.onUserInputChange(text)
             },
-            onListeningChange = {},
-            onError = {}
+            onListeningChange = { listening ->
+                // keepAlive restarts happen fast; only flip the
+                // flag off when the user explicitly stops.
+                if (!listening) {
+                    // still "active" from the user's point of view —
+                    // recognizer is mid-restart, not truly off.
+                }
+            },
+            onError = {},
+            keepAlive = true
         )
+    }
+
+    fun stopListening() {
+        isListening = false
+        speechRecognizer.stop()
     }
 
     val permissionLauncher =
@@ -213,8 +233,12 @@ fun ChatScreen(
                 viewModel.sendMessage()
             },
             isGenerating = isGenerating,
+            isListening = isListening,
             onVoiceClick = {
                 requestListening()
+            },
+            onStopVoiceClick = {
+                stopListening()
             }
         )
     }
@@ -331,7 +355,9 @@ fun ChatInputBar(
     onValueChange: (String) -> Unit,
     onSend: () -> Unit,
     isGenerating: Boolean,
-    onVoiceClick: () -> Unit
+    isListening: Boolean,
+    onVoiceClick: () -> Unit,
+    onStopVoiceClick: () -> Unit
 ) {
     Surface(
         color = VisionCardBg,
@@ -368,9 +394,32 @@ fun ChatInputBar(
                 Icon(
                     imageVector = Icons.Default.Mic,
                     contentDescription = "Voice Dictation",
-                    tint = VisionPrimaryPurple,
+                    tint = if (isListening) {
+                        VisionRose
+                    } else {
+                        VisionPrimaryPurple
+                    },
                     modifier = Modifier.size(22.dp)
                 )
+            }
+
+            if (isListening) {
+                IconButton(
+                    onClick = onStopVoiceClick,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(VisionRose.copy(alpha = 0.15f))
+                        .testTag("stop_voice_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Stop listening",
+                        tint = VisionRose,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(6.dp))
             }
 
             OutlinedTextField(
@@ -378,7 +427,11 @@ fun ChatInputBar(
                 onValueChange = onValueChange,
                 placeholder = {
                     Text(
-                        text = "Message Vision...",
+                        text = if (isListening) {
+                            "Sun rahi hoon..."
+                        } else {
+                            "Message Vision..."
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                         color = VisionTextMuted
                     )
