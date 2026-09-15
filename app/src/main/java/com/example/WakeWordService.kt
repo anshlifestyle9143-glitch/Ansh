@@ -21,7 +21,7 @@ import android.view.WindowManager
 import android.widget.FrameLayout
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
-import com.example.util.GeminiTtsManager
+import com.example.util.TtsManager
 import com.rementia.openwakeword.lib.WakeWordEngine
 import com.rementia.openwakeword.lib.model.DetectionMode
 import com.rementia.openwakeword.lib.model.WakeWordModel
@@ -51,7 +51,7 @@ class WakeWordService : Service() {
     private var overlayWindowManager: WindowManager? = null
 
     private var voiceController: VisionVoiceController? = null
-    private var ttsManager: GeminiTtsManager? = null
+    private var ttsManager: TtsManager? = null
     private var commandExecutor: VisionCommandExecutor? = null
 
     @Volatile
@@ -68,8 +68,7 @@ class WakeWordService : Service() {
 
         createNotificationChannel()
 
-        ttsManager =
-            GeminiTtsManager(this)
+        ttsManager = TtsManager(this)
 
         commandExecutor =
             VisionCommandExecutor(this)
