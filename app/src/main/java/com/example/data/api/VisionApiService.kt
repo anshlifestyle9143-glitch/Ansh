@@ -49,11 +49,30 @@ object VisionRetrofitClient {
             .create(VisionApiService::class.java)
     }
 
+    // Main chat (VisionRepository) — Google account #1
     fun getApiKey(): String {
         return try {
             BuildConfig.GEMINI_API_KEY
         } catch (e: Exception) {
             ""
+        }
+    }
+
+    // Intent classification (VisionIntentClassifier) — Google account #2
+    fun getIntentApiKey(): String {
+        return try {
+            BuildConfig.GEMINI_API_KEY_2
+        } catch (e: Exception) {
+            getApiKey()
+        }
+    }
+
+    // Command execution (VisionCommandExecutor) — Google account #3
+    fun getCommandApiKey(): String {
+        return try {
+            BuildConfig.GEMINI_API_KEY_3
+        } catch (e: Exception) {
+            getApiKey()
         }
     }
 }
