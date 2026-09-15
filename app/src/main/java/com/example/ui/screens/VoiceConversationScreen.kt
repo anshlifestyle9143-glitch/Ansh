@@ -48,6 +48,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import com.example.service.VisionCommandExecutor
 import com.example.service.VisionIntentClassifier
 import com.example.ui.theme.VisionBackground
 import com.example.ui.theme.VisionDeepPlum
@@ -101,11 +102,6 @@ fun VoiceConversationScreen(
         LiveSpeechRecognizer(context)
     }
 
-    /*
-     * ---------------------------------------------------------------
-     * START LISTENING
-     * ---------------------------------------------------------------
-     */
     fun startListening() {
 
         if (!active) return
@@ -143,39 +139,6 @@ fun VoiceConversationScreen(
                     return@start
                 }
 
-                /*
-                 * ---------------------------------------------------
-                 * SEMANTIC INTENT CLASSIFICATION
-                 * ---------------------------------------------------
-                 *
-                 * No keyword matching.
-                 *
-                 * VisionIntentClassifier decides whether the
-                 * user's sentence is:
-                 *
-                 * ACTION
-                 * CONVERSATION
-                 * QUESTION
-                 * SEARCH
-                 * UNCLEAR
-                 *
-                 * Therefore:
-                 *
-                 * "Flashlight on kar do"
-                 * "Phone ki torch chalu karo"
-                 * "Light jala do"
-                 *
-                 * can all become ACTION.
-                 *
-                 * While:
-                 *
-                 * "Kaise ho?"
-                 * "Tum kya kar rahi ho?"
-                 *
-                 * remain normal conversation.
-                 * ---------------------------------------------------
-                 */
-
                 coroutineScope.launch {
 
                     val intentType =
@@ -189,12 +152,6 @@ fun VoiceConversationScreen(
 
                         } catch (e: Exception) {
 
-                            /*
-                             * Never execute an action if
-                             * classification fails.
-                             *
-                             * Safely fall back to normal AI.
-                             */
                             VisionIntentClassifier
                                 .IntentType
                                 .CONVERSATION
@@ -206,11 +163,6 @@ fun VoiceConversationScreen(
 
                     when (intentType) {
 
-                        /*
-                         * ------------------------------------------------
-                         * REAL ACTION
-                         * ------------------------------------------------
-                         */
                         VisionIntentClassifier
                             .IntentType
                             .ACTION -> {
@@ -218,17 +170,11 @@ fun VoiceConversationScreen(
                             callState =
                                 VoiceCallState.SPEAKING
 
-                            /*
-                             * Only ACTION receives "Ok Boss".
-                             */
                             viewModel.ttsManager.speak(
                                 "Ok Boss",
                                 -System.currentTimeMillis()
                             )
 
-                            /*
-                             * Wait until "Ok Boss" starts.
-                             */
                             val okBossStarted =
                                 withTimeoutOrNull(
                                     3000L
@@ -243,10 +189,6 @@ fun VoiceConversationScreen(
 
                                 } == true
 
-                            /*
-                             * Wait until "Ok Boss"
-                             * finishes.
-                             */
                             if (okBossStarted) {
 
                                 withTimeoutOrNull(
@@ -268,25 +210,76 @@ fun VoiceConversationScreen(
                                 VoiceCallState.THINKING
 
                             /*
-                             * Send the ORIGINAL natural-language
-                             * command to Vision.
-                             *
-                             * The executor layer will later turn
-                             * this semantic command into an actual
-                             * device action.
+                             * ---------------------------------------
+                             * ACTUALLY EXECUTE THE DEVICE COMMAND
+                             * ---------------------------------------
                              */
-                            viewModel.sendMessage(
-                                overridePrompt =
-                                    cleanText,
-                                autoSpeak = true
+                            val result =
+                                try {
+
+                                    VisionCommandExecutor(context)
+                                        .execute(cleanText)
+
+                                } catch (e: Exception) {
+
+                                    VisionCommandExecutor.CommandResult(
+                                        success = false,
+                                        action = "UNKNOWN",
+                                        message =
+                                            "Command execute nahi ho payi, Boss."
+                                    )
+                                }
+
+                            if (!active) {
+                                return@launch
+                            }
+
+                            callState =
+                                VoiceCallState.SPEAKING
+
+                            viewModel.ttsManager.speak(
+                                result.message,
+                                -System.currentTimeMillis()
                             )
+
+                            val resultStarted =
+                                withTimeoutOrNull(
+                                    3000L
+                                ) {
+
+                                    viewModel
+                                        .ttsManager
+                                        .isSpeaking
+                                        .first { it }
+
+                                    true
+
+                                } == true
+
+                            if (resultStarted) {
+
+                                withTimeoutOrNull(
+                                    10000L
+                                ) {
+
+                                    viewModel
+                                        .ttsManager
+                                        .isSpeaking
+                                        .first { !it }
+                                }
+                            }
+
+                            if (!active) {
+                                return@launch
+                            }
+
+                            delay(300L)
+
+                            if (active) {
+                                startListening()
+                            }
                         }
 
-                        /*
-                         * ------------------------------------------------
-                         * NORMAL CONVERSATION
-                         * ------------------------------------------------
-                         */
                         VisionIntentClassifier
                             .IntentType
                             .CONVERSATION -> {
@@ -294,14 +287,6 @@ fun VoiceConversationScreen(
                             callState =
                                 VoiceCallState.THINKING
 
-                            /*
-                             * IMPORTANT:
-                             *
-                             * No "Ok Boss".
-                             *
-                             * Example:
-                             * "Kaise ho?"
-                             */
                             viewModel.sendMessage(
                                 overridePrompt =
                                     cleanText,
@@ -309,11 +294,6 @@ fun VoiceConversationScreen(
                             )
                         }
 
-                        /*
-                         * ------------------------------------------------
-                         * QUESTION
-                         * ------------------------------------------------
-                         */
                         VisionIntentClassifier
                             .IntentType
                             .QUESTION -> {
@@ -321,12 +301,6 @@ fun VoiceConversationScreen(
                             callState =
                                 VoiceCallState.THINKING
 
-                            /*
-                             * No "Ok Boss".
-                             *
-                             * Example:
-                             * "Aaj mausam kaisa hai?"
-                             */
                             viewModel.sendMessage(
                                 overridePrompt =
                                     cleanText,
@@ -334,11 +308,6 @@ fun VoiceConversationScreen(
                             )
                         }
 
-                        /*
-                         * ------------------------------------------------
-                         * SEARCH
-                         * ------------------------------------------------
-                         */
                         VisionIntentClassifier
                             .IntentType
                             .SEARCH -> {
@@ -346,12 +315,6 @@ fun VoiceConversationScreen(
                             callState =
                                 VoiceCallState.THINKING
 
-                            /*
-                             * No "Ok Boss".
-                             *
-                             * Search/web handling remains with
-                             * the AI layer for now.
-                             */
                             viewModel.sendMessage(
                                 overridePrompt =
                                     cleanText,
@@ -359,11 +322,6 @@ fun VoiceConversationScreen(
                             )
                         }
 
-                        /*
-                         * ------------------------------------------------
-                         * UNCLEAR
-                         * ------------------------------------------------
-                         */
                         VisionIntentClassifier
                             .IntentType
                             .UNCLEAR -> {
@@ -376,9 +334,6 @@ fun VoiceConversationScreen(
                                 -System.currentTimeMillis()
                             )
 
-                            /*
-                             * Wait for clarification TTS.
-                             */
                             withTimeoutOrNull(
                                 10000L
                             ) {
@@ -399,9 +354,6 @@ fun VoiceConversationScreen(
                                 return@launch
                             }
 
-                            /*
-                             * Listen again.
-                             */
                             startListening()
                         }
                     }
@@ -422,15 +374,7 @@ fun VoiceConversationScreen(
                         VoiceCallState.LISTENING
 
                 } else {
-
-                    /*
-                     * Do NOT set IDLE here.
-                     *
-                     * SpeechRecognizer may report
-                     * onEndOfSpeech() before onResults().
-                     *
-                     * Final result/error controls state.
-                     */
+                    // Final result/error controls state.
                 }
             },
 
@@ -442,32 +386,14 @@ fun VoiceConversationScreen(
 
                 listeningStarted = false
 
-                /*
-                 * LiveSpeechRecognizer in continuous mode
-                 * handles temporary recognition failures.
-                 */
                 callState =
                     VoiceCallState.IDLE
             },
 
-            /*
-             * TRUE means:
-             *
-             * Voice conversation stays active.
-             *
-             * There is no fixed 2.5 second finish watchdog.
-             *
-             * User closes the screen manually.
-             */
             continuous = true
         )
     }
 
-    /*
-     * ---------------------------------------------------------------
-     * MICROPHONE PERMISSION
-     * ---------------------------------------------------------------
-     */
     val permissionLauncher =
         rememberLauncherForActivityResult(
             contract =
@@ -491,11 +417,6 @@ fun VoiceConversationScreen(
             }
         }
 
-    /*
-     * ---------------------------------------------------------------
-     * REQUEST LISTENING
-     * ---------------------------------------------------------------
-     */
     fun requestListening() {
 
         if (!active) return
@@ -521,11 +442,6 @@ fun VoiceConversationScreen(
         }
     }
 
-    /*
-     * ---------------------------------------------------------------
-     * CLEANUP
-     * ---------------------------------------------------------------
-     */
     DisposableEffect(Unit) {
 
         onDispose {
@@ -538,19 +454,6 @@ fun VoiceConversationScreen(
         }
     }
 
-    /*
-     * ---------------------------------------------------------------
-     * WAKE WORD ACTIVATION
-     *
-     * Hey Jarvis
-     *      ↓
-     * Yes Boss
-     *      ↓
-     * TTS complete
-     *      ↓
-     * Microphone ON
-     * ---------------------------------------------------------------
-     */
     LaunchedEffect(Unit) {
 
         callState =
@@ -561,9 +464,6 @@ fun VoiceConversationScreen(
             -System.currentTimeMillis()
         )
 
-        /*
-         * Wait for Yes Boss to start.
-         */
         val yesBossStarted =
             withTimeoutOrNull(
                 3000L
@@ -578,9 +478,6 @@ fun VoiceConversationScreen(
 
             } == true
 
-        /*
-         * Wait for Yes Boss to finish.
-         */
         if (yesBossStarted) {
 
             withTimeoutOrNull(
@@ -594,9 +491,6 @@ fun VoiceConversationScreen(
             }
         }
 
-        /*
-         * Small safety gap before microphone.
-         */
         delay(400L)
 
         if (active) {
@@ -604,11 +498,6 @@ fun VoiceConversationScreen(
         }
     }
 
-    /*
-     * ---------------------------------------------------------------
-     * AI GENERATION STATE
-     * ---------------------------------------------------------------
-     */
     LaunchedEffect(isGenerating) {
 
         if (!active) {
@@ -622,19 +511,10 @@ fun VoiceConversationScreen(
             callState =
                 VoiceCallState.THINKING
 
-            /*
-             * Stop recognition while Vision is
-             * generating the answer.
-             */
             speechRecognizer.stop()
         }
     }
 
-    /*
-     * ---------------------------------------------------------------
-     * TTS STATE
-     * ---------------------------------------------------------------
-     */
     LaunchedEffect(isSpeaking) {
 
         if (!active) {
@@ -666,19 +546,6 @@ fun VoiceConversationScreen(
         }
     }
 
-    /*
-     * ---------------------------------------------------------------
-     * AFTER AI RESPONSE
-     *
-     * Voice page stays active.
-     *
-     * Vision finishes speaking
-     *          ↓
-     * microphone starts again
-     *
-     * It does NOT automatically close after 2–3 seconds.
-     * ---------------------------------------------------------------
-     */
     LaunchedEffect(
         isGenerating,
         isSpeaking
@@ -703,11 +570,6 @@ fun VoiceConversationScreen(
         }
     }
 
-    /*
-     * ---------------------------------------------------------------
-     * ANIMATION
-     * ---------------------------------------------------------------
-     */
     val infiniteTransition =
         rememberInfiniteTransition(
             label = "voice_pulse"
@@ -748,13 +610,6 @@ fun VoiceConversationScreen(
                 )
         }
 
-    /*
-     * ---------------------------------------------------------------
-     * UI
-     *
-     * Existing visual structure preserved.
-     * ---------------------------------------------------------------
-     */
     Box(
         modifier =
             Modifier
@@ -764,11 +619,6 @@ fun VoiceConversationScreen(
                 )
     ) {
 
-        /*
-         * -----------------------------------------------------------
-         * EXISTING VOICE ORB
-         * -----------------------------------------------------------
-         */
         Column(
             modifier =
                 Modifier
@@ -850,11 +700,6 @@ fun VoiceConversationScreen(
             )
         }
 
-        /*
-         * -----------------------------------------------------------
-         * CLOSE BUTTON
-         * -----------------------------------------------------------
-         */
         IconButton(
             onClick = {
 
@@ -884,11 +729,6 @@ fun VoiceConversationScreen(
             )
         }
 
-        /*
-         * -----------------------------------------------------------
-         * VISION BOTTOM POPUP
-         * -----------------------------------------------------------
-         */
         Surface(
             modifier =
                 Modifier
