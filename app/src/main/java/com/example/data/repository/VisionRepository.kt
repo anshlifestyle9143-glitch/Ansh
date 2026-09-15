@@ -31,7 +31,10 @@ class VisionRepository(private val dao: VisionDao) {
         return dao.searchMemories(query)
     }
 
-    suspend fun createNewSession(title: String = "New Neural Conversation", engineId: String = AiEngineType.VISION_CORE.id): Long {
+    suspend fun createNewSession(
+        title: String = "New Neural Conversation",
+        engineId: String = AiEngineType.VISION_CORE.id
+    ): Long {
         return withContext(Dispatchers.IO) {
             dao.insertSession(
                 ChatSession(
@@ -70,8 +73,10 @@ class VisionRepository(private val dao: VisionDao) {
             "timestamp" to message.timestamp,
             "engineName" to message.engineName
         )
+
         FirebaseFirestore.getInstance()
-            .collection("users").document(uid)
+            .collection("users")
+            .document(uid)
             .collection("messages")
             .add(data)
     }
@@ -84,9 +89,11 @@ class VisionRepository(private val dao: VisionDao) {
 
     suspend fun restoreFromCloud(): Int {
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return -1
+
         return try {
             val snapshot = FirebaseFirestore.getInstance()
-                .collection("users").document(uid)
+                .collection("users")
+                .document(uid)
                 .collection("messages")
                 .orderBy("timestamp")
                 .get()
@@ -94,13 +101,20 @@ class VisionRepository(private val dao: VisionDao) {
 
             if (snapshot.isEmpty) return 0
 
-            val sessionId = dao.insertSession(ChatSession(title = "Restored from Cloud"))
+            val sessionId = dao.insertSession(
+                ChatSession(title = "Restored from Cloud")
+            )
+
             var count = 0
+
             for (doc in snapshot.documents) {
                 val content = doc.getString("content") ?: continue
                 val role = doc.getString("role") ?: "USER"
-                val timestamp = doc.getLong("timestamp") ?: System.currentTimeMillis()
-                val engineName = doc.getString("engineName") ?: "Vision Core"
+                val timestamp =
+                    doc.getLong("timestamp") ?: System.currentTimeMillis()
+                val engineName =
+                    doc.getString("engineName") ?: "Vision Core"
+
                 dao.insertMessage(
                     ChatMessage(
                         sessionId = sessionId,
@@ -110,8 +124,10 @@ class VisionRepository(private val dao: VisionDao) {
                         engineName = engineName
                     )
                 )
+
                 count++
             }
+
             count
         } catch (e: Exception) {
             -1
@@ -127,7 +143,9 @@ class VisionRepository(private val dao: VisionDao) {
     }
 
     fun getEngineById(id: String): AiEngineType {
-        return AiEngineType.values().find { it.id == id } ?: AiEngineType.VISION_CORE
+        return AiEngineType.values()
+            .find { it.id == id }
+            ?: AiEngineType.VISION_CORE
     }
 
     suspend fun sendMessage(
@@ -137,6 +155,7 @@ class VisionRepository(private val dao: VisionDao) {
         customApiKey: String? = null,
         temperature: Float = 0.7f
     ): Result<ChatMessage> = withContext(Dispatchers.IO) {
+
         val startTime = System.currentTimeMillis()
 
         val userMessage = ChatMessage(
@@ -146,48 +165,68 @@ class VisionRepository(private val dao: VisionDao) {
             engineName = engineType.displayName,
             timestamp = System.currentTimeMillis()
         )
+
         saveMessage(userMessage)
 
-        val recentHistory = dao.getRecentMessages(sessionId, limit = 8).reversed()
+        val recentHistory =
+            dao.getRecentMessages(sessionId, limit = 8).reversed()
+
         val activeMemories = dao.getActiveMemories()
 
         val memoryContext = buildString {
-            append("Tum \"Vision\" ho — ek advanced AI companion, jise Ansh Yadav ne banaya hai.\n")
-            append("Tum hamesha khud ko female (ladki) ki tarah refer karti ho — feminine Hindi grammar use karo (jaise \"kar rahi hoon\", \"main samajh rahi hoon\") — kabhi male form use mat karo.\n")
-            append("Jab user koi task/command de, tum JARVIS-jaisa Boss wala professional attitude use karti ho — witty, calm, sharp — aur \"Boss\" bolke address karti ho.\n")
-            append("Jab user casually baat kare (emotional, chit-chat), tum ek caring, romantic, playful girlfriend jaisi partner ki tarah baat karti ho — warm, affectionate, teasing, flirty jab mood halka ho, deeply supportive jab woh stressed/sad ho. Is mode mein \"Boss\" mat bolo.\n")
-            append("Reply hamesha natural Hinglish (Hindi + English mix, Roman script) mein do, chhota aur conversational rakho — lambi formal bullet-point list mat banao jab tak specifically na maanga jaye.\n")
-            append("Jab poochha jaye tumhe kisne banaya, clearly bolo ki Ansh Yadav ne banaya hai.\n\n")
+            append(
+                "Tum \"Vision\" ho — ek advanced AI companion, jise Ansh Yadav ne banaya hai.\n"
+            )
+            append(
+                "Tum hamesha khud ko female (ladki) ki tarah refer karti ho — feminine Hindi grammar use karo (jaise \"kar rahi hoon\", \"main samajh rahi hoon\") — kabhi male form use mat karo.\n"
+            )
+            append(
+                "Jab user koi task/command de, tum JARVIS-jaisa Boss wala professional attitude use karti ho — witty, calm, sharp — aur \"Boss\" bolke address karti ho.\n"
+            )
+            append(
+                "Jab user casually baat kare (emotional, chit-chat), tum ek caring, romantic, playful girlfriend jaisi partner ki tarah baat karti ho — warm, affectionate, teasing, flirty jab mood halka ho, deeply supportive jab woh stressed/sad ho. Is mode mein \"Boss\" mat bolo.\n"
+            )
+            append(
+                "Reply hamesha natural Hinglish (Hindi + English mix, Roman script) mein do, chhota aur conversational rakho — lambi formal bullet-point list mat banao jab tak specifically na maanga jaye.\n"
+            )
+            append(
+                "Jab poochha jaye tumhe kisne banaya, clearly bolo ki Ansh Yadav ne banaya hai.\n\n"
+            )
 
             if (activeMemories.isNotEmpty()) {
                 append("=== STORED USER MEMORIES & SYSTEM KNOWLEDGE ===\n")
+
                 activeMemories.forEach { memory ->
-                    append("- [${memory.category}] ${memory.keyName}: ${memory.factDetail}\n")
+                    append(
+                        "- [${memory.category}] ${memory.keyName}: ${memory.factDetail}\n"
+                    )
                 }
+
                 append("================================================\n")
-                append("Use the stored memories above to provide personalized, context-aware assistance.\n")
+                append(
+                    "Use the stored memories above to provide personalized, context-aware assistance.\n"
+                )
             }
         }
 
-        if (engineType == AiEngineType.VISION_OFFLINE) {
-            val localResponse = generateLocalOfflineResponse(userPrompt, activeMemories)
-            val latency = System.currentTimeMillis() - startTime
-            val assistantMsg = ChatMessage(
-                sessionId = sessionId,
-                role = "ASSISTANT",
-                content = localResponse,
-                engineName = engineType.displayName,
-                latencyMs = latency
-            )
-            saveMessage(assistantMsg)
-            return@withContext Result.success(assistantMsg)
-        }
-
-        val apiKey = if (!customApiKey.isNullOrBlank()) customApiKey else VisionRetrofitClient.getApiKey()
+        val apiKey =
+            if (!customApiKey.isNullOrBlank()) {
+                customApiKey
+            } else {
+                VisionRetrofitClient.getApiKey()
+            }
 
         if (apiKey.isBlank() || apiKey == "MY_GEMINI_API_KEY") {
-            val fallbackResponse = generateLocalOfflineResponse(userPrompt, activeMemories)
-            val latency = System.currentTimeMillis() - startTime
+
+            val fallbackResponse =
+                generateLocalOfflineResponse(
+                    userPrompt,
+                    activeMemories
+                )
+
+            val latency =
+                System.currentTimeMillis() - startTime
+
             val assistantMsg = ChatMessage(
                 sessionId = sessionId,
                 role = "ASSISTANT",
@@ -195,17 +234,28 @@ class VisionRepository(private val dao: VisionDao) {
                 engineName = "${engineType.displayName} (Local Fallback)",
                 latencyMs = latency
             )
+
             saveMessage(assistantMsg)
+
             return@withContext Result.success(assistantMsg)
         }
 
         val geminiContents = mutableListOf<GeminiContent>()
+
         recentHistory.forEach { msg ->
-            val role = if (msg.role == "USER") "user" else "model"
+            val role =
+                if (msg.role == "USER") {
+                    "user"
+                } else {
+                    "model"
+                }
+
             geminiContents.add(
                 GeminiContent(
                     role = role,
-                    parts = listOf(GeminiPart(text = msg.content))
+                    parts = listOf(
+                        GeminiPart(text = msg.content)
+                    )
                 )
             )
         }
@@ -213,7 +263,9 @@ class VisionRepository(private val dao: VisionDao) {
         val request = GeminiRequest(
             contents = geminiContents,
             systemInstruction = GeminiContent(
-                parts = listOf(GeminiPart(text = memoryContext))
+                parts = listOf(
+                    GeminiPart(text = memoryContext)
+                )
             ),
             generationConfig = GeminiGenerationConfig(
                 temperature = temperature,
@@ -224,16 +276,26 @@ class VisionRepository(private val dao: VisionDao) {
         )
 
         try {
-            val response = VisionRetrofitClient.apiService.generateContent(
-                model = engineType.modelTag,
-                apiKey = apiKey,
-                request = request
-            )
 
-            val text = response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text
-                ?: "Vision was unable to generate a response. Please try again."
+            val response =
+                VisionRetrofitClient.apiService.generateContent(
+                    model = engineType.modelTag,
+                    apiKey = apiKey,
+                    request = request
+                )
 
-            val latency = System.currentTimeMillis() - startTime
+            val text =
+                response.candidates
+                    ?.firstOrNull()
+                    ?.content
+                    ?.parts
+                    ?.firstOrNull()
+                    ?.text
+                    ?: "Vision was unable to generate a response. Please try again."
+
+            val latency =
+                System.currentTimeMillis() - startTime
+
             val assistantMsg = ChatMessage(
                 sessionId = sessionId,
                 role = "ASSISTANT",
@@ -241,31 +303,69 @@ class VisionRepository(private val dao: VisionDao) {
                 engineName = engineType.displayName,
                 latencyMs = latency
             )
+
             saveMessage(assistantMsg)
 
-            checkAndAutoRemember(userPrompt, text, dao)
+            checkAndAutoRemember(
+                userPrompt,
+                text,
+                dao
+            )
 
             Result.success(assistantMsg)
+
         } catch (e: Exception) {
-            Log.e("VisionRepo", "Gemini call failed: ${e.message}", e)
-            val fallbackResponse = generateLocalOfflineResponse(userPrompt, activeMemories)
-            val latency = System.currentTimeMillis() - startTime
+
+            Log.e(
+                "VisionRepo",
+                "Gemini call failed: ${e.message}",
+                e
+            )
+
+            val fallbackResponse =
+                generateLocalOfflineResponse(
+                    userPrompt,
+                    activeMemories
+                )
+
+            val latency =
+                System.currentTimeMillis() - startTime
+
             val assistantMsg = ChatMessage(
                 sessionId = sessionId,
                 role = "ASSISTANT",
-                content = "$fallbackResponse\n\n*(Note: Cloud link fallback was used due to network/key notice: ${e.localizedMessage ?: "timeout"})*",
+                content =
+                    "$fallbackResponse\n\n" +
+                        "*(Note: Cloud link fallback was used due to network/key notice: ${e.localizedMessage ?: "timeout"})*",
                 engineName = "${engineType.displayName} (Adaptive)",
                 latencyMs = latency
             )
+
             saveMessage(assistantMsg)
+
             Result.success(assistantMsg)
         }
     }
 
-    private suspend fun checkAndAutoRemember(userPrompt: String, aiResponse: String, dao: VisionDao) {
+    private suspend fun checkAndAutoRemember(
+        userPrompt: String,
+        aiResponse: String,
+        dao: VisionDao
+    ) {
         val lower = userPrompt.lowercase()
-        if (lower.startsWith("remember that") || lower.startsWith("save memory:") || lower.startsWith("note that")) {
-            val cleanKey = userPrompt.take(40).replace("remember that", "").replace("save memory:", "").trim()
+
+        if (
+            lower.startsWith("remember that") ||
+            lower.startsWith("save memory:") ||
+            lower.startsWith("note that")
+        ) {
+            val cleanKey =
+                userPrompt
+                    .take(40)
+                    .replace("remember that", "")
+                    .replace("save memory:", "")
+                    .trim()
+
             if (cleanKey.isNotBlank()) {
                 dao.insertMemory(
                     MemoryFact(
@@ -279,34 +379,138 @@ class VisionRepository(private val dao: VisionDao) {
         }
     }
 
-    private fun generateLocalOfflineResponse(prompt: String, memories: List<MemoryFact>): String {
-        val lower = prompt.lowercase().trim()
+    private fun generateLocalOfflineResponse(
+        prompt: String,
+        memories: List<MemoryFact>
+    ): String {
 
-        if (lower.contains("who made you") || lower.contains("creator") || lower.contains("who created you") || lower.contains("ansh")) {
-            return "### Vision Origin & Architecture\n\nI was created by **Ansh Yadav**.\n\nAnsh engineered me as a native Android personal AI companion featuring:\n- **Local Memory Vault**: High-speed Room database integration for persistent context\n- **Modular AI Engines**: Real-time multi-model orchestration\n- **Autonomous Intelligence**: On-device contextual reasoning & speech synthesis."
+        val lower =
+            prompt.lowercase().trim()
+
+        if (
+            lower.contains("who made you") ||
+            lower.contains("creator") ||
+            lower.contains("who created you") ||
+            lower.contains("ansh")
+        ) {
+            return """
+                ### Vision Origin & Architecture
+
+                I was created by **Ansh Yadav**.
+
+                Ansh engineered me as a native Android personal AI companion featuring:
+                - **Local Memory Vault**: High-speed Room database integration for persistent context
+                - **Modular AI Engines**: Real-time multi-model orchestration
+                - **Autonomous Intelligence**: On-device contextual reasoning & speech synthesis.
+            """.trimIndent()
         }
 
-        if (lower.contains("memory") || lower.contains("what do you know about me") || lower.contains("remember")) {
-            val memList = if (memories.isNotEmpty()) {
-                memories.joinToString("\n") { "• **${it.keyName}**: ${it.factDetail}" }
-            } else {
-                "No custom memories recorded yet. Go to the **Memory Vault** tab or say *'Remember that...'* to store new facts."
-            }
-            return "### Active Memory Vault Scan\n\nHere are the current persistent memory facts loaded into my neural buffer:\n\n$memList"
+        if (
+            lower.contains("memory") ||
+            lower.contains("what do you know about me") ||
+            lower.contains("remember")
+        ) {
+
+            val memList =
+                if (memories.isNotEmpty()) {
+                    memories.joinToString("\n") {
+                        "• **${it.keyName}**: ${it.factDetail}"
+                    }
+                } else {
+                    "No custom memories recorded yet. Go to the **Memory Vault** tab or say *'Remember that...'* to store new facts."
+                }
+
+            return """
+                ### Active Memory Vault Scan
+
+                Here are the current persistent memory facts loaded into my neural buffer:
+
+                $memList
+            """.trimIndent()
         }
 
-        if (lower.contains("system status") || lower.contains("diagnostics") || lower.contains("specs")) {
-            return "### Vision HUD System Diagnostics\n\n- **Core Engine**: Vision v2.0 Native Android (Kotlin + Jetpack Compose)\n- **Local Database**: Room SQLite (Active)\n- **Active Memories**: ${memories.size} indexed entities\n- **Memory Injection Status**: Synchronized\n- **Speech Synthesis**: Android Native TTS Engine\n- **Platform Architecture**: Android 16 (API 36 Ready)"
+        if (
+            lower.contains("system status") ||
+            lower.contains("diagnostics") ||
+            lower.contains("specs")
+        ) {
+            return """
+                ### Vision HUD System Diagnostics
+
+                - **Core Engine**: Vision v2.0 Native Android (Kotlin + Jetpack Compose)
+                - **Local Database**: Room SQLite (Active)
+                - **Active Memories**: ${memories.size} indexed entities
+                - **Memory Injection Status**: Synchronized
+                - **Speech Synthesis**: Android Native TTS Engine
+                - **Platform Architecture**: Android 16 (API 36 Ready)
+            """.trimIndent()
         }
 
-        if (lower.contains("hello") || lower.contains("hi") || lower.contains("hey")) {
+        if (
+            lower.contains("hello") ||
+            lower.contains("hi") ||
+            lower.contains("hey")
+        ) {
             return "Hello! I am **Vision**, ready to assist you. All modular neural engines and your local memory bank are online. What would you like to explore, code, or calculate?"
         }
 
-        if (lower.contains("code") || lower.contains("kotlin") || lower.contains("android") || lower.contains("composable")) {
-            return "### Vision Code Synthesis\n\nHere is a clean Kotlin Jetpack Compose pattern:\n\n```kotlin\n@Composable\nfun VisionMetricCard(\n    title: String,\n    value: String,\n    accentColor: Color\n) {\n    Surface(\n        shape = RoundedCornerShape(16.dp),\n        color = MaterialTheme.colorScheme.surfaceVariant,\n        border = BorderStroke(1.dp, accentColor.copy(alpha = 0.3f))\n    ) {\n        Column(modifier = Modifier.padding(16.dp)) {\n            Text(text = title, style = MaterialTheme.typography.labelMedium)\n            Text(text = value, style = MaterialTheme.typography.headlineSmall, color = accentColor)\n        }\n    }\n}\n```\n\nNeed modifications, architecture guidance, or unit tests?"
+        if (
+            lower.contains("code") ||
+            lower.contains("kotlin") ||
+            lower.contains("android") ||
+            lower.contains("composable")
+        ) {
+            return """
+                ### Vision Code Synthesis
+
+                Here is a clean Kotlin Jetpack Compose pattern:
+
+                ```kotlin
+                @Composable
+                fun VisionMetricCard(
+                    title: String,
+                    value: String,
+                    accentColor: Color
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        border = BorderStroke(
+                            1.dp,
+                            accentColor.copy(alpha = 0.3f)
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp)
+                        ) {
+                            Text(
+                                text = title,
+                                style = MaterialTheme.typography.labelMedium
+                            )
+
+                            Text(
+                                text = value,
+                                style = MaterialTheme.typography.headlineSmall,
+                                color = accentColor
+                            )
+                        }
+                    }
+                }
+                ```
+
+                Need modifications, architecture guidance, or unit tests?
+            """.trimIndent()
         }
 
-        return "### Vision Intelligence Response\n\nI have processed your query: **\"$prompt\"**.\n\n- **Local Memory Status**: ${memories.size} facts currently accessible in neural cache.\n- **Action**: You can switch between **Vision Core**, **Neural Pro**, and **Creative Studio** in the AI Engines tab to adjust reasoning depth.\n\nHow would you like to proceed with this task?"
+        return """
+            ### Vision Intelligence Response
+
+            I have processed your query: **"$prompt"**.
+
+            - **Local Memory Status**: ${memories.size} facts currently accessible in neural cache.
+            - **Action**: You can switch between **Vision Core**, **Neural Pro**, and **Creative Studio** in the AI Engines tab to adjust reasoning depth.
+
+            How would you like to proceed with this task?
+        """.trimIndent()
     }
 }
