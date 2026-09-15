@@ -41,6 +41,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.viewmodel.VisionViewModel
+import com.example.ui.components.VisionTab
 import kotlinx.coroutines.delay
 import kotlin.math.cos
 import kotlin.math.sin
@@ -870,11 +871,3 @@ private fun MountainFooter(
 /* ============================================================
    VISION TAB
    ============================================================ */
-
-enum class VisionTab {
-    HOME,
-    CHAT,
-    MEMORY,
-    CREATOR,
-    SETTINGS
-}
