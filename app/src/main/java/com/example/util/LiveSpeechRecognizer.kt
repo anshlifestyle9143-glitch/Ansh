@@ -23,18 +23,29 @@ class LiveSpeechRecognizer(
     private var finalDelivered = false
     private var continuousMode = false
 
+    /**
+     * When true, the recognizer automatically restarts listening
+     * after every completed utterance (onFinal) and after silence
+     * timeouts, so it keeps running indefinitely until stop() is
+     * called explicitly. This is what makes "never stops until I
+     * manually stop it" behaviour possible.
+     */
+    private var keepAliveMode = false
+
     fun start(
         onPartial: (String) -> Unit,
         onFinal: (String) -> Unit,
         onListeningChange: (Boolean) -> Unit,
         onError: () -> Unit,
-        continuous: Boolean = false
+        continuous: Boolean = false,
+        keepAlive: Boolean = false
     ) {
         active = true
         sessionId++
         lastPartialText = ""
         finalDelivered = false
         continuousMode = continuous
+        keepAliveMode = keepAlive
 
         cancelFinishWatchdog()
 
@@ -136,7 +147,7 @@ class LiveSpeechRecognizer(
                                 cancelFinishWatchdog()
                                 onListeningChange(false)
 
-                                if (continuousMode) {
+                                if (continuousMode || keepAliveMode) {
 
                                     handler.postDelayed({
 
@@ -202,7 +213,38 @@ class LiveSpeechRecognizer(
                                 } catch (_: Exception) {
                                 }
 
-                                onFinal(finalText)
+                                if (finalText.isNotBlank()) {
+                                    onFinal(finalText)
+                                }
+
+                                /*
+                                 * KEEP-ALIVE: automatically resume
+                                 * listening for the next utterance,
+                                 * so this never stops until stop()
+                                 * is called explicitly.
+                                 */
+                                if (keepAliveMode) {
+
+                                    handler.postDelayed({
+
+                                        if (
+                                            active &&
+                                            currentSession == sessionId
+                                        ) {
+                                            finalDelivered = false
+                                            lastPartialText = ""
+
+                                            startRecognition(
+                                                currentSession,
+                                                onPartial,
+                                                onFinal,
+                                                onListeningChange,
+                                                onError
+                                            )
+                                        }
+
+                                    }, 250L)
+                                }
                             }
 
                             override fun onPartialResults(
@@ -268,19 +310,19 @@ class LiveSpeechRecognizer(
                 putExtra(
                     RecognizerIntent
                         .EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS,
-                    if (continuousMode) 5000L else 1500L
+                    if (continuousMode || keepAliveMode) 5000L else 1500L
                 )
 
                 putExtra(
                     RecognizerIntent
                         .EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS,
-                    if (continuousMode) 5000L else 1500L
+                    if (continuousMode || keepAliveMode) 5000L else 1500L
                 )
 
                 putExtra(
                     RecognizerIntent
                         .EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS,
-                    if (continuousMode) 1000L else 1500L
+                    if (continuousMode || keepAliveMode) 1000L else 1500L
                 )
             }
 
@@ -295,7 +337,7 @@ class LiveSpeechRecognizer(
                 currentSession == sessionId
             ) {
 
-                if (continuousMode) {
+                if (continuousMode || keepAliveMode) {
 
                     handler.postDelayed({
 
@@ -373,6 +415,7 @@ class LiveSpeechRecognizer(
         lastPartialText = ""
         finalDelivered = false
         continuousMode = false
+        keepAliveMode = false
 
         cancelFinishWatchdog()
 
@@ -389,6 +432,7 @@ class LiveSpeechRecognizer(
         lastPartialText = ""
         finalDelivered = false
         continuousMode = false
+        keepAliveMode = false
 
         cancelFinishWatchdog()
 
