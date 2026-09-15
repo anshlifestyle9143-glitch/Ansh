@@ -79,7 +79,7 @@ class VisionIntentClassifier {
         }
 
         val apiKey =
-            VisionRetrofitClient.getApiKey()
+            VisionRetrofitClient.getIntentApiKey()
 
         /*
          * If the Gemini key is unavailable, do NOT guess
