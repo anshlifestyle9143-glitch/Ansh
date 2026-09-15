@@ -1,7 +1,6 @@
 package com.example.ui.components
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
@@ -38,13 +37,6 @@ enum class VisionTab(
         selectedIcon = Icons.Filled.Psychology,
         unselectedIcon = Icons.Outlined.Psychology,
         testTag = "nav_tab_memory"
-    ),
-
-    ENGINES(
-        title = "AI Engines",
-        selectedIcon = Icons.Filled.AutoAwesome,
-        unselectedIcon = Icons.Outlined.Tune,
-        testTag = "nav_tab_engines"
     ),
 
     CREATOR(
