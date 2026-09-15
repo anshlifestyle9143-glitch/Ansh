@@ -7,8 +7,6 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,9 +20,6 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -43,7 +38,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
-import com.example.data.model.AiEngineType
 import com.example.ui.theme.VisionBackground
 import com.example.ui.theme.VisionCardBorder
 import com.example.ui.theme.VisionDeepPlum
@@ -53,8 +47,6 @@ import com.example.ui.theme.VisionLilacPill
 
 @Composable
 fun VisionHeader(
-    activeEngine: AiEngineType,
-    onEngineClick: () -> Unit,
     onHistoryClick: () -> Unit,
     onNewChatClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -141,7 +133,7 @@ fun VisionHeader(
                 }
             }
 
-            // Vision Core — Right Side
+            // Vision Core — Static Identity Label
             Surface(
                 shape = RoundedCornerShape(20.dp),
                 color = VisionLilacPill,
@@ -151,34 +143,18 @@ fun VisionHeader(
                 ),
                 modifier = Modifier
                     .clip(RoundedCornerShape(20.dp))
-                    .clickable {
-                        onEngineClick()
-                    }
                     .testTag("engine_selector_chip")
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
+                Text(
+                    text = "Vision Core",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = VisionDeepPlum,
                     modifier = Modifier.padding(
                         horizontal = 10.dp,
                         vertical = 6.dp
                     )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Tune,
-                        contentDescription = "Switch Engine",
-                        tint = VisionDeepPlum,
-                        modifier = Modifier.size(13.dp)
-                    )
-
-                    Spacer(modifier = Modifier.width(5.dp))
-
-                    Text(
-                        text = activeEngine.displayName,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = VisionDeepPlum
-                    )
-                }
+                )
             }
         }
     }
