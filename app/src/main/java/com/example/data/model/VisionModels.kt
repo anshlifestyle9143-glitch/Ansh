@@ -15,7 +15,7 @@ enum class AiEngineType(
         id = "vision_core",
         displayName = "Vision Core",
         description = "Ultra-fast neural latency. Optimized for daily workflows, conversation, and fast execution.",
-        modelTag = "gemini-3.5-flash",
+        modelTag = "gemini-3.5-flash-lite",
         iconName = "Bolt",
         badgeColorHex = 0xFF6750A4
     ),
@@ -31,7 +31,7 @@ enum class AiEngineType(
         id = "vision_creative",
         displayName = "Creative Studio",
         description = "Unbounded synthesis & imagination. Optimized for design ideation, storytelling, and persona crafting.",
-        modelTag = "gemini-3.5-flash",
+        modelTag = "gemini-3.5-flash-lite",
         iconName = "AutoAwesome",
         badgeColorHex = 0xFF9A4058
     ),
