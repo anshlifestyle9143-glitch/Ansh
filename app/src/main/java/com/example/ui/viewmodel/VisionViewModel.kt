@@ -33,8 +33,7 @@ class VisionViewModel(application: Application) : AndroidViewModel(application) 
     private val repository =
         VisionRepository(database.visionDao())
 
-    val ttsManager =
-        GeminiTtsManager(application)
+    val ttsManager = TtsManager(application)
 
     /*
      * ---------------------------------------------------------
