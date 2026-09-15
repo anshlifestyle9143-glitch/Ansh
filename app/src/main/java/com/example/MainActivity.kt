@@ -25,14 +25,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import com.example.ui.components.EngineSelectorSheet
 import com.example.ui.components.SessionDrawerSheet
 import com.example.ui.components.VisionHeader
 import com.example.ui.components.VisionTab
 import com.example.ui.screens.ChatScreen
 import com.example.ui.screens.CreatorScreen
 import com.example.ui.screens.DashboardScreen
-import com.example.ui.screens.EnginesScreen
 import com.example.ui.screens.MemoryVaultScreen
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.VoiceConversationScreen
@@ -71,15 +69,15 @@ class MainActivity : ComponentActivity() {
 
         handleIntent(intent)
     }
-    
+
     private fun openOverlayPermissionSettings() {
-    if (!Settings.canDrawOverlays(this)) {
-        val intent = Intent(
-            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-            Uri.parse("package:$packageName")
-        )
-        startActivity(intent)
-    }
+        if (!Settings.canDrawOverlays(this)) {
+            val intent = Intent(
+                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse("package:$packageName")
+            )
+            startActivity(intent)
+        }
     }
 
     private fun handleIntent(intent: Intent?) {
@@ -127,15 +125,10 @@ fun VisionApp(
         mutableStateOf(false)
     }
 
-    var showEngineSheet by remember {
-        mutableStateOf(false)
-    }
-
     var showHistorySheet by remember {
         mutableStateOf(false)
     }
 
-    val activeEngine by viewModel.activeEngine.collectAsState()
     val sessions by viewModel.sessions.collectAsState()
     val currentSessionId by viewModel.currentSessionId.collectAsState()
     val toastMessage by viewModel.toastMessage.collectAsState()
@@ -183,15 +176,13 @@ fun VisionApp(
      *
      * Priority:
      * 1. Voice screen -> Home
-     * 2. Engine sheet -> close sheet
-     * 3. History sheet -> close sheet
-     * 4. Any inner screen -> Home
-     * 5. Home -> normal Android back
+     * 2. History sheet -> close sheet
+     * 3. Any inner screen -> Home
+     * 4. Home -> normal Android back
      */
     BackHandler(
         enabled =
             showVoiceCall ||
-                    showEngineSheet ||
                     showHistorySheet ||
                     currentTab != VisionTab.HOME
     ) {
@@ -205,10 +196,6 @@ fun VisionApp(
                 if (wakeWordEnabled) {
                     viewModel.startWakeWordService()
                 }
-            }
-
-            showEngineSheet -> {
-                showEngineSheet = false
             }
 
             showHistorySheet -> {
@@ -250,12 +237,6 @@ fun VisionApp(
             topBar = {
 
                 VisionHeader(
-                    activeEngine = activeEngine,
-
-                    onEngineClick = {
-                        showEngineSheet = true
-                    },
-
                     onHistoryClick = {
                         showHistorySheet = true
                     },
@@ -332,13 +313,6 @@ fun VisionApp(
                         )
                     }
 
-                    VisionTab.ENGINES -> {
-
-                        EnginesScreen(
-                            viewModel = viewModel
-                        )
-                    }
-
                     VisionTab.CREATOR -> {
 
                         CreatorScreen(
@@ -355,10 +329,6 @@ fun VisionApp(
                                 currentTab = VisionTab.HOME
                             },
 
-                            onOpenEngines = {
-                                currentTab = VisionTab.ENGINES
-                            },
-
                             onOpenMemory = {
                                 currentTab = VisionTab.MEMORY
                             },
@@ -370,24 +340,6 @@ fun VisionApp(
                     }
                 }
             }
-        }
-
-        if (showEngineSheet) {
-
-            EngineSelectorSheet(
-                selectedEngine = activeEngine,
-
-                onEngineSelected = { engine ->
-
-                    viewModel.setEngine(engine)
-
-                    showEngineSheet = false
-                },
-
-                onDismiss = {
-                    showEngineSheet = false
-                }
-            )
         }
 
         if (showHistorySheet) {
