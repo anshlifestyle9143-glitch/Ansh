@@ -18,30 +18,6 @@ enum class AiEngineType(
         modelTag = "gemini-3.5-flash-lite",
         iconName = "Bolt",
         badgeColorHex = 0xFF6750A4
-    ),
-    VISION_NEURAL_PRO(
-        id = "vision_neural_pro",
-        displayName = "Neural Pro",
-        description = "High-precision deep reasoning engine. Specialized for software engineering, STEM, and complex problem-solving.",
-        modelTag = "gemini-3.1-pro-preview",
-        iconName = "Psychology",
-        badgeColorHex = 0xFF21005D
-    ),
-    VISION_CREATIVE(
-        id = "vision_creative",
-        displayName = "Creative Studio",
-        description = "Unbounded synthesis & imagination. Optimized for design ideation, storytelling, and persona crafting.",
-        modelTag = "gemini-3.5-flash-lite",
-        iconName = "AutoAwesome",
-        badgeColorHex = 0xFF9A4058
-    ),
-    VISION_OFFLINE(
-        id = "vision_offline",
-        displayName = "Offline Vault Engine",
-        description = "Local on-device reasoning & local memory recall. Operates without requiring cloud network latency.",
-        modelTag = "on-device-local",
-        iconName = "Storage",
-        badgeColorHex = 0xFF7E5700
     )
 }
 
