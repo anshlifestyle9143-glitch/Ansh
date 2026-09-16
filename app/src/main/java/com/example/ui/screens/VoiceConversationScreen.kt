@@ -534,37 +534,43 @@ fun VoiceConversationScreen(
 
         } else {
 
-            if (
-                !isGenerating &&
-                callState ==
-                    VoiceCallState.SPEAKING
-            ) {
+            if (!isGenerating) {
 
-                callState =
-                    VoiceCallState.IDLE
+                delay(300L)
+
+                if (
+                    active &&
+                    !isGenerating &&
+                    !isSpeaking
+                ) {
+                    requestListening()
+                }
             }
         }
     }
 
-    LaunchedEffect(
-        isGenerating,
-        isSpeaking
-    ) {
+    LaunchedEffect(isGenerating) {
 
         if (!active) {
             return@LaunchedEffect
         }
 
-        if (
-            !isGenerating &&
-            !isSpeaking &&
-            callState ==
+        if (isGenerating) {
+
+            callState =
                 VoiceCallState.THINKING
-        ) {
 
-            delay(300L)
+            speechRecognizer.stop()
 
-            if (active) {
+        } else {
+
+            delay(200L)
+
+            if (
+                active &&
+                !isGenerating &&
+                !isSpeaking
+            ) {
                 requestListening()
             }
         }
