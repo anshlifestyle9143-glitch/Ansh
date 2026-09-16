@@ -352,8 +352,27 @@ class VisionCommandExecutor(
                     Context.CAMERA_SERVICE
                 ) as CameraManager
 
+            // Prefer the back-facing camera with flash first —
+            // on multi-camera phones the first "has flash" ID
+            // in the raw list isn't always the real physical
+            // flash unit, which can cause silent no-op failures.
             val cameraId =
                 cameraManager.cameraIdList.firstOrNull { id ->
+
+                    val characteristics =
+                        cameraManager.getCameraCharacteristics(id)
+
+                    val hasFlash = characteristics.get(
+                        CameraCharacteristics.FLASH_INFO_AVAILABLE
+                    ) == true
+
+                    val isBackFacing = characteristics.get(
+                        CameraCharacteristics.LENS_FACING
+                    ) == CameraCharacteristics.LENS_FACING_BACK
+
+                    hasFlash && isBackFacing
+
+                } ?: cameraManager.cameraIdList.firstOrNull { id ->
 
                     val characteristics =
                         cameraManager.getCameraCharacteristics(id)
