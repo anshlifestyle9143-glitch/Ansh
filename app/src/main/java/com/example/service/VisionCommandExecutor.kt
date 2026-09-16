@@ -441,7 +441,7 @@ class VisionCommandExecutor(
                 message = "Boss, flashlight control karne ki permission nahi mili."
             )
 
-        } catch (e: Exception) {
+                } catch (e: Exception) {
 
             Log.e(TAG, "Flashlight execution failed", e)
 
@@ -452,3 +452,4 @@ class VisionCommandExecutor(
             )
         }
     }
+}
