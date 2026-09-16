@@ -23,7 +23,15 @@ class VisionVoiceController(
 
     companion object {
         private const val TAG = "VisionVoiceController"
+
         private const val MAX_RECOGNITION_RETRIES = 2
+
+        /*
+         * If user does not start another command within
+         * this time after listening begins, the voice session
+         * will automatically dismiss.
+         */
+        private const val IDLE_TIMEOUT_MS = 6000L
     }
 
     private val scope =
@@ -33,6 +41,11 @@ class VisionVoiceController(
 
     private var recognizer: LiveSpeechRecognizer? = null
     private var listeningJob: Job? = null
+
+    /*
+     * Automatically cancels the 6-second idle timer.
+     */
+    private var idleTimeoutJob: Job? = null
 
     @Volatile
     private var active = false
@@ -57,14 +70,20 @@ class VisionVoiceController(
         onCommand: (String) -> Unit,
         onDismiss: () -> Unit
     ) {
+
         if (active) {
-            Log.d(TAG, "start(): already active")
+            Log.d(
+                TAG,
+                "start(): already active"
+            )
             return
         }
 
         active = true
         processing = false
         recognitionRetryCount = 0
+
+        cancelIdleTimeout()
 
         onListeningCallback = onListening
         onThinkingCallback = onThinking
@@ -79,7 +98,10 @@ class VisionVoiceController(
         listeningJob =
             scope.launch {
 
-                Log.d(TAG, "Speaking: Yes Boss")
+                Log.d(
+                    TAG,
+                    "Speaking: Yes Boss"
+                )
 
                 speakAndWait(
                     "Yes Boss",
@@ -102,7 +124,10 @@ class VisionVoiceController(
 
     private fun listenForInput() {
 
-        if (!active || processing) {
+        if (
+            !active ||
+            processing
+        ) {
             return
         }
 
@@ -112,13 +137,17 @@ class VisionVoiceController(
                 Manifest.permission.RECORD_AUDIO
             ) != PackageManager.PERMISSION_GRANTED
         ) {
+
             Log.w(
                 TAG,
                 "RECORD_AUDIO permission missing"
             )
 
+            cancelIdleTimeout()
+
             stop()
             onDismissCallback()
+
             return
         }
 
@@ -138,6 +167,12 @@ class VisionVoiceController(
                     return@start
                 }
 
+                /*
+                 * User has started speaking.
+                 * Cancel the idle timeout immediately.
+                 */
+                cancelIdleTimeout()
+
                 Log.d(
                     TAG,
                     "Partial speech: $text"
@@ -149,6 +184,12 @@ class VisionVoiceController(
                 if (!active) {
                     return@start
                 }
+
+                /*
+                 * User produced a final result.
+                 * The current listening timeout is no longer needed.
+                 */
+                cancelIdleTimeout()
 
                 val cleanText =
                     text.trim()
@@ -198,6 +239,17 @@ class VisionVoiceController(
 
                     onListeningCallback()
 
+                    /*
+                     * Start the 6-second countdown whenever
+                     * the microphone becomes ready.
+                     *
+                     * This covers:
+                     * 1. Initial listening after "Yes Boss"
+                     * 2. Listening after an AI response
+                     * 3. Listening after a command
+                     */
+                    startIdleTimeout()
+
                 } else {
 
                     Log.d(
@@ -212,6 +264,8 @@ class VisionVoiceController(
                 if (!active) {
                     return@start
                 }
+
+                cancelIdleTimeout()
 
                 processing = false
 
@@ -256,6 +310,54 @@ class VisionVoiceController(
 
             continuous = true
         )
+    }
+
+    /*
+     * ------------------------------------------------------------
+     * 6 SECOND IDLE TIMEOUT
+     * ------------------------------------------------------------
+     */
+    private fun startIdleTimeout() {
+
+        cancelIdleTimeout()
+
+        if (!active) {
+            return
+        }
+
+        idleTimeoutJob =
+            scope.launch {
+
+                Log.d(
+                    TAG,
+                    "Starting ${IDLE_TIMEOUT_MS}ms voice idle timeout"
+                )
+
+                delay(IDLE_TIMEOUT_MS)
+
+                if (
+                    !active ||
+                    processing
+                ) {
+                    return@launch
+                }
+
+                Log.d(
+                    TAG,
+                    "Voice idle timeout reached - " +
+                        "dismissing session"
+                )
+
+                stop()
+
+                onDismissCallback()
+            }
+    }
+
+    private fun cancelIdleTimeout() {
+
+        idleTimeoutJob?.cancel()
+        idleTimeoutJob = null
     }
 
     private fun classifyIntent(
@@ -315,9 +417,9 @@ class VisionVoiceController(
                         }
 
                         /*
-                         * WakeWordService will execute the
-                         * command and decide when to resume
-                         * listening.
+                         * WakeWordService executes the command.
+                         *
+                         * After execution it calls resumeListening().
                          */
                         onCommandCallback(text)
                     }
@@ -336,14 +438,11 @@ class VisionVoiceController(
                         onThinkingCallback()
 
                         /*
-                         * IMPORTANT:
+                         * Do NOT resume here.
                          *
-                         * Do NOT call resumeListening() here.
+                         * WakeWordService:
                          *
-                         * WakeWordService will send this text
-                         * to VisionRepository, receive the AI
-                         * response, speak it using TTS, and only
-                         * then resume listening.
+                         * AI → TTS → resumeListening()
                          */
                         onConversationCallback(text)
                     }
@@ -361,12 +460,6 @@ class VisionVoiceController(
 
                         onThinkingCallback()
 
-                        /*
-                         * AI response flow is controlled by
-                         * WakeWordService.
-                         *
-                         * No immediate resume here.
-                         */
                         onConversationCallback(text)
                     }
 
@@ -383,13 +476,6 @@ class VisionVoiceController(
 
                         onThinkingCallback()
 
-                        /*
-                         * Search/question/conversation all go
-                         * through the AI brain callback for now.
-                         *
-                         * WakeWordService handles the response
-                         * and resumes listening afterwards.
-                         */
                         onConversationCallback(text)
                     }
 
@@ -436,11 +522,8 @@ class VisionVoiceController(
                 }
 
                 /*
-                 * If classifier itself fails, send the text
-                 * to the AI brain instead of silently dropping it.
-                 *
-                 * WakeWordService is responsible for responding
-                 * and resuming listening.
+                 * If classification fails, still send the
+                 * original text to the AI brain.
                  */
                 onConversationCallback(text)
             }
@@ -455,6 +538,8 @@ class VisionVoiceController(
         if (!active) {
             return
         }
+
+        cancelIdleTimeout()
 
         onSpeaking()
 
@@ -515,6 +600,8 @@ class VisionVoiceController(
             return
         }
 
+        cancelIdleTimeout()
+
         processing = false
 
         scope.launch {
@@ -537,6 +624,8 @@ class VisionVoiceController(
         active = false
         processing = false
         recognitionRetryCount = 0
+
+        cancelIdleTimeout()
 
         onListeningCallback = {}
         onThinkingCallback = {}
