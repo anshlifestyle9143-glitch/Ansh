@@ -345,6 +345,20 @@ class VisionCommandExecutor(
         enabled: Boolean
     ): CommandResult {
 
+        val hasPermission =
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.CAMERA
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+        if (!hasPermission) {
+            return CommandResult(
+                success = false,
+                action = FLASHLIGHT,
+                message = "Boss, camera permission nahi mili. App kholke pehle allow karo."
+            )
+        }
+
         return try {
 
             val cameraManager =
@@ -352,10 +366,6 @@ class VisionCommandExecutor(
                     Context.CAMERA_SERVICE
                 ) as CameraManager
 
-            // Prefer the back-facing camera with flash first —
-            // on multi-camera phones the first "has flash" ID
-            // in the raw list isn't always the real physical
-            // flash unit, which can cause silent no-op failures.
             val cameraId =
                 cameraManager.cameraIdList.firstOrNull { id ->
 
@@ -391,10 +401,18 @@ class VisionCommandExecutor(
                 )
             }
 
-            cameraManager.setTorchMode(
-                cameraId,
-                enabled
-            )
+            // MediaTek/Tecno jaise kuch devices pe pehli call
+            // "success" return karti hai par hardware turant
+            // respond nahi karta — isliye ek chhota retry.
+            try {
+                cameraManager.setTorchMode(cameraId, enabled)
+            } catch (e: Exception) {
+                Log.w(TAG, "First torch attempt failed, retrying", e)
+            }
+
+            Thread.sleep(150)
+
+            cameraManager.setTorchMode(cameraId, enabled)
 
             if (enabled) {
 
@@ -415,11 +433,7 @@ class VisionCommandExecutor(
 
         } catch (e: SecurityException) {
 
-            Log.e(
-                TAG,
-                "Flashlight permission/security error",
-                e
-            )
+            Log.e(TAG, "Flashlight permission/security error", e)
 
             CommandResult(
                 success = false,
@@ -429,11 +443,7 @@ class VisionCommandExecutor(
 
         } catch (e: Exception) {
 
-            Log.e(
-                TAG,
-                "Flashlight execution failed",
-                e
-            )
+            Log.e(TAG, "Flashlight execution failed", e)
 
             CommandResult(
                 success = false,
@@ -442,4 +452,3 @@ class VisionCommandExecutor(
             )
         }
     }
-}
