@@ -113,7 +113,7 @@ class LiveSpeechRecognizer(
                                 buffer: ByteArray?
                             ) = Unit
 
-                            override fun onEndOfSpeech() {
+                                                        override fun onEndOfSpeech() {
                                 if (
                                     !active ||
                                     currentSession != sessionId ||
@@ -129,6 +129,7 @@ class LiveSpeechRecognizer(
                                     onFinal,
                                     onError
                                 )
+                            }
 
                             override fun onError(
                                 error: Int
