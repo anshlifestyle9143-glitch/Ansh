@@ -5,8 +5,8 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.util.Log
 import androidx.core.content.ContextCompat
-import com.example.util.TtsManager
 import com.example.util.LiveSpeechRecognizer
+import com.example.util.TtsManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -28,8 +28,7 @@ class VisionVoiceController(
 
     private val scope =
         CoroutineScope(
-            Dispatchers.Main.immediate +
-                SupervisorJob()
+            Dispatchers.Main.immediate + SupervisorJob()
         )
 
     private var recognizer: LiveSpeechRecognizer? = null
@@ -51,14 +50,13 @@ class VisionVoiceController(
     private var onDismissCallback: () -> Unit = {}
 
     fun start(
-        onListening: () -> Unit = {},
-        onThinking: () -> Unit = {},
-        onSpeaking: () -> Unit = {},
-        onConversation: (String) -> Unit = {},
-        onCommand: (String) -> Unit = {},
-        onDismiss: () -> Unit = {}
+        onListening: () -> Unit,
+        onThinking: () -> Unit,
+        onSpeaking: () -> Unit,
+        onConversation: (String) -> Unit,
+        onCommand: (String) -> Unit,
+        onDismiss: () -> Unit
     ) {
-
         if (active) {
             Log.d(TAG, "start(): already active")
             return
@@ -75,29 +73,31 @@ class VisionVoiceController(
         onCommandCallback = onCommand
         onDismissCallback = onDismiss
 
-        recognizer = LiveSpeechRecognizer(context)
+        recognizer =
+            LiveSpeechRecognizer(context)
 
-        listeningJob = scope.launch {
+        listeningJob =
+            scope.launch {
 
-            Log.d(TAG, "Speaking: Yes Boss")
+                Log.d(TAG, "Speaking: Yes Boss")
 
-            speakAndWait(
-                text = "Yes Boss",
-                onSpeaking = onSpeaking
-            )
+                speakAndWait(
+                    "Yes Boss",
+                    onSpeaking
+                )
 
-            if (!active) {
-                return@launch
+                if (!active) {
+                    return@launch
+                }
+
+                delay(700L)
+
+                if (!active) {
+                    return@launch
+                }
+
+                listenForInput()
             }
-
-            delay(700L)
-
-            if (!active) {
-                return@launch
-            }
-
-            listenForInput()
-        }
     }
 
     private fun listenForInput() {
@@ -112,14 +112,13 @@ class VisionVoiceController(
                 Manifest.permission.RECORD_AUDIO
             ) != PackageManager.PERMISSION_GRANTED
         ) {
-            Log.e(
+            Log.w(
                 TAG,
                 "RECORD_AUDIO permission missing"
             )
 
             stop()
             onDismissCallback()
-
             return
         }
 
@@ -127,10 +126,9 @@ class VisionVoiceController(
 
         val speech =
             recognizer
-                ?: LiveSpeechRecognizer(context)
-                    .also {
-                        recognizer = it
-                    }
+                ?: LiveSpeechRecognizer(context).also {
+                    recognizer = it
+                }
 
         speech.start(
 
@@ -152,7 +150,8 @@ class VisionVoiceController(
                     return@start
                 }
 
-                val cleanText = text.trim()
+                val cleanText =
+                    text.trim()
 
                 Log.d(
                     TAG,
@@ -170,6 +169,7 @@ class VisionVoiceController(
                     )
 
                     scope.launch {
+
                         delay(250L)
 
                         if (active) {
@@ -230,7 +230,7 @@ class VisionVoiceController(
                     Log.d(
                         TAG,
                         "Retrying speech recognition: " +
-                            "$recognitionRetryCount"
+                            recognitionRetryCount
                     )
 
                     scope.launch {
@@ -258,7 +258,9 @@ class VisionVoiceController(
         )
     }
 
-    private fun classifyIntent(text: String) {
+    private fun classifyIntent(
+        text: String
+    ) {
 
         if (!active) {
             return
@@ -290,33 +292,65 @@ class VisionVoiceController(
 
                 when (result.type) {
 
+                    // -------------------------------------------------
+                    // ACTION
+                    // -------------------------------------------------
+
                     VisionIntentClassifier.IntentType.ACTION -> {
+
+                        Log.d(
+                            TAG,
+                            "Action detected"
+                        )
 
                         onThinkingCallback()
 
                         speakAndWait(
-                            text = "Ok Boss",
-                            onSpeaking = onSpeakingCallback
+                            "Ok Boss",
+                            onSpeakingCallback
                         )
 
                         if (!active) {
                             return@launch
                         }
 
+                        /*
+                         * WakeWordService will execute the
+                         * command and decide when to resume
+                         * listening.
+                         */
                         onCommandCallback(text)
                     }
+
+                    // -------------------------------------------------
+                    // CONVERSATION
+                    // -------------------------------------------------
 
                     VisionIntentClassifier.IntentType.CONVERSATION -> {
 
                         Log.d(
                             TAG,
-                            "Normal conversation"
+                            "Normal conversation detected"
                         )
 
-                        onConversationCallback(text)
+                        onThinkingCallback()
 
-                        resumeListening()
+                        /*
+                         * IMPORTANT:
+                         *
+                         * Do NOT call resumeListening() here.
+                         *
+                         * WakeWordService will send this text
+                         * to VisionRepository, receive the AI
+                         * response, speak it using TTS, and only
+                         * then resume listening.
+                         */
+                        onConversationCallback(text)
                     }
+
+                    // -------------------------------------------------
+                    // QUESTION
+                    // -------------------------------------------------
 
                     VisionIntentClassifier.IntentType.QUESTION -> {
 
@@ -325,10 +359,20 @@ class VisionVoiceController(
                             "Question detected"
                         )
 
-                        onConversationCallback(text)
+                        onThinkingCallback()
 
-                        resumeListening()
+                        /*
+                         * AI response flow is controlled by
+                         * WakeWordService.
+                         *
+                         * No immediate resume here.
+                         */
+                        onConversationCallback(text)
                     }
+
+                    // -------------------------------------------------
+                    // SEARCH
+                    // -------------------------------------------------
 
                     VisionIntentClassifier.IntentType.SEARCH -> {
 
@@ -337,10 +381,21 @@ class VisionVoiceController(
                             "Search request detected"
                         )
 
-                        onConversationCallback(text)
+                        onThinkingCallback()
 
-                        resumeListening()
+                        /*
+                         * Search/question/conversation all go
+                         * through the AI brain callback for now.
+                         *
+                         * WakeWordService handles the response
+                         * and resumes listening afterwards.
+                         */
+                        onConversationCallback(text)
                     }
+
+                    // -------------------------------------------------
+                    // UNCLEAR
+                    // -------------------------------------------------
 
                     VisionIntentClassifier.IntentType.UNCLEAR -> {
 
@@ -350,8 +405,8 @@ class VisionVoiceController(
                         )
 
                         speakAndWait(
-                            text = "Boss, thoda clearly bataiye.",
-                            onSpeaking = onSpeakingCallback
+                            "Boss, thoda clearly bataiye.",
+                            onSpeakingCallback
                         )
 
                         if (!active) {
@@ -381,10 +436,11 @@ class VisionVoiceController(
                 }
 
                 /*
-                 * Classification failure must never
-                 * directly execute a device action.
+                 * If classifier itself fails, send the text
+                 * to the AI brain instead of silently dropping it.
                  *
-                 * Send it to normal AI conversation.
+                 * WakeWordService is responsible for responding
+                 * and resuming listening.
                  */
                 onConversationCallback(text)
             }
@@ -435,7 +491,6 @@ class VisionVoiceController(
                 ttsManager
                     .isSpeaking
                     .first { !it }
-
             }
 
             Log.d(
@@ -452,11 +507,9 @@ class VisionVoiceController(
         }
     }
 
-    /**
-     * Resume microphone listening after the current
-     * voice task has completed.
-     */
-    fun resumeListening(delayMs: Long = 250L) {
+    fun resumeListening(
+        delayMs: Long = 250L
+    ) {
 
         if (!active) {
             return
