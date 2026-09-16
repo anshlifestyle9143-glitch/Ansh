@@ -10,332 +10,269 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * VisionIntentClassifier
- *
- * Fast semantic intent detection.
- *
- * This class understands the complete meaning of the request.
- * It is NOT a simple keyword matcher.
- *
- * Supported:
- *
- * ACTION
- * CONVERSATION
- * QUESTION
- * SEARCH
- * UNCLEAR
- */
+
+VisionIntentClassifier
+
+Natural-language semantic intent detection.
+
+IMPORTANT:
+
+This class does NOT use keyword matching.
+
+Examples:
+
+"Phone ki torch jala do"
+
+"Light on karo"
+
+"Andhera hai, light chalu kar do"
+
+can all be understood as ACTION.
+
+While:
+
+"Kaise ho?"
+
+"Aaj kya kar rahi ho?"
+
+are understood as CONVERSATION.
+*/
 class VisionIntentClassifier {
 
-    companion object {
+companion object {
+private const val TAG = "VisionIntentClassifier"
 
-        private const val TAG =
-            "VisionIntentClassifier"
+private const val MODEL = "gemini-3.5-flash-lite"  
 
-        /*
-         * Lightweight Gemini model used only for
-         * intent classification.
-         */
-        private const val MODEL =
-            "gemini-3.5-flash-lite"
+ private const val ACTION = "ACTION"  
+ private const val CONVERSATION = "CONVERSATION"  
+ private const val QUESTION = "QUESTION"  
+ private const val SEARCH = "SEARCH"  
+ private const val UNCLEAR = "UNCLEAR"
 
-        private const val ACTION =
-            "ACTION"
+}
 
-        private const val CONVERSATION =
-            "CONVERSATION"
+enum class IntentType {
+ACTION,
+CONVERSATION,
+QUESTION,
+SEARCH,
+UNCLEAR
+}
 
-        private const val QUESTION =
-            "QUESTION"
+data class IntentResult(
+val type: IntentType,
+val originalText: String
+)
 
-        private const val SEARCH =
-            "SEARCH"
+/**
 
-        private const val UNCLEAR =
-            "UNCLEAR"
-    }
+Converts natural language into a high-level intent.
 
-    enum class IntentType {
-        ACTION,
-        CONVERSATION,
-        QUESTION,
-        SEARCH,
-        UNCLEAR
-    }
+The model is explicitly instructed to understand meaning,
 
-    data class IntentResult(
-        val type: IntentType,
-        val originalText: String
-    )
+not search for fixed keywords.
+*/
+suspend fun classify(
+text: String
+): IntentResult = withContext(Dispatchers.IO) {
 
-    suspend fun classify(
-        text: String
-    ): IntentResult =
-        withContext(Dispatchers.IO) {
+val cleanText = text.trim()
 
-            val cleanText =
-                text.trim()
+if (cleanText.isBlank()) {
+return@withContext IntentResult(
+type = IntentType.UNCLEAR,
+originalText = cleanText
+)
+}
 
-            if (cleanText.isBlank()) {
+val apiKey =
+VisionRetrofitClient.getIntentApiKey()
 
-                return@withContext IntentResult(
-                    type = IntentType.UNCLEAR,
-                    originalText = cleanText
-                )
-            }
+/*
 
-            val apiKey =
-                VisionRetrofitClient
-                    .getIntentApiKey()
+If the Gemini key is unavailable, do NOT guess
 
-            /*
-             * No API key:
-             *
-             * Never guess an ACTION.
-             */
-            if (
-                apiKey.isBlank() ||
-                apiKey == "MY_GEMINI_API_KEY"
-            ) {
+using keywords. Safely treat it as conversation
 
-                Log.w(
-                    TAG,
-                    "Intent API key unavailable"
-                )
+so we never accidentally execute a device action.
+*/
+if (
+apiKey.isBlank() ||
+apiKey == "MY_GEMINI_API_KEY"
+) {
+Log.w(
+TAG,
+"Gemini API key unavailable; safe conversation fallback"
+)
 
-                return@withContext IntentResult(
-                    type =
-                        IntentType.CONVERSATION,
-                    originalText =
-                        cleanText
-                )
-            }
+return@withContext IntentResult(
+type = IntentType.CONVERSATION,
+originalText = cleanText
+)
+}
 
-            /*
-             * Compact semantic instruction.
-             *
-             * Keeping this prompt short reduces request
-             * size and therefore reduces classification
-             * latency.
-             */
-            val instruction = """
-                Classify the user's COMPLETE meaning.
-                Understand Hindi, Hinglish and English.
-                Do NOT classify from isolated keywords.
 
-                Return ONLY ONE label:
-                ACTION
-                CONVERSATION
-                QUESTION
-                SEARCH
-                UNCLEAR
+val instruction = """
+You are Vision's semantic intent classifier.
 
-                ACTION = user wants a device, phone, app,
-                communication, reminder, media or other real-world
-                task performed.
+Your job is to understand the MEANING and INTENT  
+ of the user's complete natural-language request.  
 
-                CONVERSATION = casual/social conversation with Vision.
+ Do NOT use simple keyword matching.  
 
-                QUESTION = asks for knowledge, explanation,
-                calculation, reasoning or information.
+ Understand Hindi, Hinglish and English naturally.  
 
-                SEARCH = explicitly asks to search/find/look up
-                something online.
+ Return exactly ONE of these labels:  
 
-                UNCLEAR = meaning cannot be reliably determined.
+ ACTION  
+ CONVERSATION  
+ QUESTION  
+ SEARCH  
+ UNCLEAR  
 
-                Examples:
+ Meaning:  
 
-                "Phone ki torch jala do" = ACTION
-                "Andhera hai, light chalu kar do" = ACTION
-                "Mummy ko call laga do" = ACTION
-                "YouTube par Arijit Singh chalao" = ACTION
+ ACTION:  
+ The user wants Vision to perform a real-world,  
+ phone/device/app task.  
 
-                "Kaise ho?" = CONVERSATION
-                "Kya kar rahi ho?" = CONVERSATION
-                "Mujhe tumse baat karni hai" = CONVERSATION
+ Examples:  
+ "Phone ki torch jala do"  
+ "Light off kar do"  
+ "Mummy ko call laga do"  
+ "Kal subah 7 baje mujhe utha dena"  
+ "YouTube par Arijit Singh ke gaane chalao"  
 
-                "India ki capital kya hai?" = QUESTION
-                "Photosynthesis kya hota hai?" = QUESTION
-                "2 plus 2 kitna hai?" = QUESTION
+ CONVERSATION:  
+ The user is casually talking to Vision.  
+ No external/device task is being requested.  
 
-                "Google par latest news search karo" = SEARCH
-                "Internet par iske baare mein dekho" = SEARCH
+ Examples:  
+ "Kaise ho?"  
+ "Kya kar rahi ho?"  
+ "Mujhe tumse baat karni hai"  
 
-                User:
-                $cleanText
-            """.trimIndent()
+ QUESTION:  
+ The user is primarily asking for information,  
+ explanation, calculation, knowledge or reasoning.  
 
-            val request =
-                GeminiRequest(
+ Examples:  
+ "India ki capital kya hai?"  
+ "Photosynthesis kya hota hai?"  
+ "2 plus 2 kitna hota hai?"  
 
-                    contents =
-                        listOf(
-                            GeminiContent(
-                                role = "user",
-                                parts =
-                                    listOf(
-                                        GeminiPart(
-                                            text =
-                                                instruction
-                                        )
-                                    )
-                            )
-                        ),
+ SEARCH:  
+ The user explicitly wants something searched,  
+ looked up or found online.  
 
-                    generationConfig =
-                        GeminiGenerationConfig(
+ Examples:  
+ "Google par latest news search karo"  
+ "Internet par iske baare mein dekho"  
 
-                            /*
-                             * Deterministic classification.
-                             */
-                            temperature = 0.0f,
+ UNCLEAR:  
+ The request cannot be reliably understood.  
 
-                            /*
-                             * No need for broad sampling.
-                             */
-                            topP = 1.0f,
-                            topK = 1,
+ IMPORTANT:  
+ A request can contain words associated with actions  
+ while still being conversation or a question.  
+ Decide from the complete meaning and context.  
 
-                            /*
-                             * Output is only one word.
-                             */
-                            maxOutputTokens = 4
-                        )
-                )
+ User text:  
+ $cleanText
 
-            val startTime =
-                System.currentTimeMillis()
+""".trimIndent()
 
-            try {
+val request =
+GeminiRequest(
+contents =
+listOf(
+GeminiContent(
+role = "user",
+parts =
+listOf(
+GeminiPart(
+text = instruction
+)
+)
+)
+),
+generationConfig =
+GeminiGenerationConfig(
+temperature = 0.0f,
+topP = 1.0f,
+topK = 1,
+maxOutputTokens = 10
+)
+)
 
-                val response =
-                    VisionRetrofitClient
-                        .apiService
-                        .generateContent(
-                            model = MODEL,
-                            apiKey = apiKey,
-                            request = request
-                        )
+try {
 
-                val raw =
-                    response
-                        .candidates
-                        ?.firstOrNull()
-                        ?.content
-                        ?.parts
-                        ?.firstOrNull()
-                        ?.text
-                        ?.trim()
-                        ?.uppercase()
-                        .orEmpty()
+val response =  
+     VisionRetrofitClient.apiService.generateContent(  
+         model = MODEL,  
+         apiKey = apiKey,  
+         request = request  
+     )  
 
-                /*
-                 * Exact label matching is safer than
-                 * contains().
-                 *
-                 * Example:
-                 * "NOT_ACTION" should not become ACTION.
-                 */
-                val intent =
-                    when (raw) {
+ val raw =  
+     response  
+         .candidates  
+         ?.firstOrNull()  
+         ?.content  
+         ?.parts  
+         ?.firstOrNull()  
+         ?.text  
+         ?.trim()  
+         ?.uppercase()  
+         ?: ""  
 
-                        ACTION ->
-                            IntentType.ACTION
+ val intent =  
+     when {  
+         raw.contains(ACTION) ->  
+             IntentType.ACTION  
 
-                        CONVERSATION ->
-                            IntentType.CONVERSATION
+         raw.contains(SEARCH) ->  
+             IntentType.SEARCH  
 
-                        QUESTION ->
-                            IntentType.QUESTION
+         raw.contains(QUESTION) ->  
+             IntentType.QUESTION  
 
-                        SEARCH ->
-                            IntentType.SEARCH
+         raw.contains(CONVERSATION) ->  
+             IntentType.CONVERSATION  
 
-                        UNCLEAR ->
-                            IntentType.UNCLEAR
+         else ->  
+             IntentType.UNCLEAR  
+     }  
 
-                        else -> {
+ Log.d(  
+     TAG,  
+     "Semantic intent: $intent | text=[$cleanText]"  
+ )  
 
-                            /*
-                             * Sometimes models return:
-                             * "ACTION\n"
-                             * or extra formatting.
-                             *
-                             * Take the first clean token.
-                             */
-                            val firstToken =
-                                raw
-                                    .replace(
-                                        "`",
-                                        ""
-                                    )
-                                    .replace(
-                                        "*",
-                                        ""
-                                    )
-                                    .split(
-                                        Regex("\\s+")
-                                    )
-                                    .firstOrNull()
-                                    .orEmpty()
+ IntentResult(  
+     type = intent,  
+     originalText = cleanText  
+ )
 
-                            when (firstToken) {
+} catch (e: Exception) {
 
-                                ACTION ->
-                                    IntentType.ACTION
+Log.e(  
+     TAG,  
+     "Intent classification failed",  
+     e  
+ )  
 
-                                CONVERSATION ->
-                                    IntentType.CONVERSATION
+ /*  
+  * Safety rule:  
+  * Never execute a device action when  
+  * semantic classification failed.  
+  */  
+ IntentResult(  
+     type = IntentType.CONVERSATION,  
+     originalText = cleanText  
+ )
 
-                                QUESTION ->
-                                    IntentType.QUESTION
-
-                                SEARCH ->
-                                    IntentType.SEARCH
-
-                                else ->
-                                    IntentType.UNCLEAR
-                            }
-                        }
-                    }
-
-                val latency =
-                    System.currentTimeMillis() -
-                        startTime
-
-                Log.d(
-                    TAG,
-                    "Intent=$intent | " +
-                        "latency=${latency}ms | " +
-                        "text=[$cleanText]"
-                )
-
-                IntentResult(
-                    type = intent,
-                    originalText = cleanText
-                )
-
-            } catch (e: Exception) {
-
-                Log.e(
-                    TAG,
-                    "Intent classification failed",
-                    e
-                )
-
-                /*
-                 * Safety:
-                 *
-                 * Never execute an ACTION if the
-                 * classifier fails.
-                 */
-                IntentResult(
-                    type =
-                        IntentType.CONVERSATION,
-                    originalText =
-                        cleanText
-                )
-            }
-        }
+}
+}
 }
