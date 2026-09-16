@@ -21,6 +21,9 @@ import android.view.WindowManager
 import android.widget.FrameLayout
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import com.example.data.local.VisionDatabase
+import com.example.data.model.AiEngineType
+import com.example.data.repository.VisionRepository
 import com.example.util.TtsManager
 import com.rementia.openwakeword.lib.WakeWordEngine
 import com.rementia.openwakeword.lib.model.DetectionMode
@@ -31,8 +34,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 class WakeWordService : Service() {
 
@@ -54,6 +58,20 @@ class WakeWordService : Service() {
     private var ttsManager: TtsManager? = null
     private var commandExecutor: VisionCommandExecutor? = null
 
+    /*
+     * AI brain used by the voice interface.
+     */
+    private var visionRepository: VisionRepository? = null
+
+    /*
+     * One Room chat session is maintained for the
+     * current "Hey Jarvis" voice conversation.
+     *
+     * It is cleared when the voice session ends.
+     */
+    @Volatile
+    private var voiceSessionId: Long? = null
+
     @Volatile
     private var running = false
 
@@ -68,10 +86,26 @@ class WakeWordService : Service() {
 
         createNotificationChannel()
 
-        ttsManager = TtsManager(this)
+        ttsManager =
+            TtsManager(this)
 
         commandExecutor =
             VisionCommandExecutor(this)
+
+        /*
+         * Use the existing singleton VisionDatabase.
+         * The DAO is NOT changed.
+         */
+        val database =
+            VisionDatabase.getDatabase(
+                this,
+                serviceScope
+            )
+
+        visionRepository =
+            VisionRepository(
+                database.visionDao()
+            )
 
         voiceController =
             VisionVoiceController(
@@ -81,27 +115,26 @@ class WakeWordService : Service() {
 
         wakeWordEngine =
             createWakeWordEngine()
+
+        Log.d(
+            TAG,
+            "WakeWordService created"
+        )
     }
 
     private fun createWakeWordEngine(): WakeWordEngine {
-
         return WakeWordEngine(
             context = this,
-
-            models =
-                listOf(
-                    WakeWordModel(
-                        name = "Hey Jarvis",
-                        modelPath = "hey_jarvis_v0.1.onnx",
-                        threshold = 0.10f
-                    )
-                ),
-
+            models = listOf(
+                WakeWordModel(
+                    name = "Hey Jarvis",
+                    modelPath = "hey_jarvis_v0.1.onnx",
+                    threshold = 0.10f
+                )
+            ),
             detectionMode =
                 DetectionMode.SINGLE_BEST,
-
-            detectionCooldownMs =
-                2000L
+            detectionCooldownMs = 2000L
         )
     }
 
@@ -116,7 +149,10 @@ class WakeWordService : Service() {
             buildNotification()
         )
 
-        if (!running && !voiceActive) {
+        if (
+            !running &&
+            !voiceActive
+        ) {
             startWakeWordDetection()
         }
 
@@ -125,14 +161,16 @@ class WakeWordService : Service() {
 
     private fun startWakeWordDetection() {
 
-        if (running || voiceActive) {
+        if (
+            running ||
+            voiceActive
+        ) {
             return
         }
 
         val engine =
             wakeWordEngine
                 ?: run {
-
                     wakeWordEngine =
                         createWakeWordEngine()
 
@@ -152,7 +190,10 @@ class WakeWordService : Service() {
 
                     engine.detections.collect { detection ->
 
-                        if (!running || voiceActive) {
+                        if (
+                            !running ||
+                            voiceActive
+                        ) {
                             return@collect
                         }
 
@@ -192,7 +233,6 @@ class WakeWordService : Service() {
                         )
 
                         showVisionOverlay()
-
                         startVoiceController()
                     }
 
@@ -205,7 +245,6 @@ class WakeWordService : Service() {
                     )
 
                     running = false
-
                     scheduleRestart()
                 }
             }
@@ -228,7 +267,6 @@ class WakeWordService : Service() {
             )
 
             running = false
-
             scheduleRestart()
         }
     }
@@ -239,7 +277,9 @@ class WakeWordService : Service() {
 
             try {
 
-                if (!Settings.canDrawOverlays(this)) {
+                if (
+                    !Settings.canDrawOverlays(this)
+                ) {
 
                     Log.w(
                         TAG,
@@ -247,7 +287,6 @@ class WakeWordService : Service() {
                     )
 
                     finishVoiceSession()
-
                     return@post
                 }
 
@@ -277,15 +316,9 @@ class WakeWordService : Service() {
                     WindowManager.LayoutParams(
                         dp(330),
                         dp(330),
-
-                        WindowManager.LayoutParams
-                            .TYPE_APPLICATION_OVERLAY,
-
-                        WindowManager.LayoutParams
-                            .FLAG_NOT_FOCUSABLE or
-                            WindowManager.LayoutParams
-                            .FLAG_NOT_TOUCH_MODAL,
-
+                        WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
                         PixelFormat.TRANSLUCENT
                     ).apply {
 
@@ -325,7 +358,6 @@ class WakeWordService : Service() {
                 )
 
                 removeVisionOverlayNow()
-
                 finishVoiceSession()
             }
         }
@@ -352,10 +384,13 @@ class WakeWordService : Service() {
                 )
 
                 finishVoiceSession()
-
                 return@post
             }
 
+            /*
+             * New voice conversation starts here.
+             */
+            voiceSessionId = null
             voiceActive = true
 
             Log.d(
@@ -396,13 +431,7 @@ class WakeWordService : Service() {
                         "Conversation input: $text"
                     )
 
-                    /*
-                     * Conversation/question/search
-                     * does NOT receive "Ok Boss".
-                     *
-                     * Natural conversation handling will
-                     * be connected in the AI brain layer.
-                     */
+                    handleAiConversation(text)
                 },
 
                 onCommand = { command ->
@@ -412,92 +441,7 @@ class WakeWordService : Service() {
                         "Command input: $command"
                     )
 
-                    /*
-                     * VisionVoiceController has already
-                     * classified this as ACTION and has
-                     * spoken "Ok Boss".
-                     *
-                     * Now execute the actual device action.
-                     */
-
-                    serviceScope.launch {
-
-                        try {
-
-                            val executor =
-                                commandExecutor
-
-                            if (executor == null) {
-
-                                Log.e(
-                                    TAG,
-                                    "Command executor unavailable"
-                                )
-
-                                ttsManager?.speak(
-    "Boss, command executor available nahi hai.",
-    System.currentTimeMillis()
-)
-
-                                delay(1500L)
-
-                                voiceController?.resumeListening()
-
-                                return@launch
-                            }
-
-                            val result =
-                                executor.execute(
-                                    command
-                                )
-
-                            Log.d(
-                                TAG,
-                                "Command execution result: " +
-                                    "success=${result.success}, " +
-                                    "action=${result.action}, " +
-                                    "message=${result.message}"
-                            )
-
-                            ttsManager?.speak(
-    result.message,
-    System.currentTimeMillis()
-)
-                                
-                            
-
-                            /*
-                             * Give TTS time to finish before
-                             * opening the microphone again.
-                             */
-                            delay(1500L)
-
-                            if (voiceActive) {
-                                voiceController?.resumeListening()
-                            }
-
-                        } catch (e: Exception) {
-
-                            Log.e(
-                                TAG,
-                                "Command execution failed",
-                                e
-                            )
-
-                            ttsManager?.speak(
-    "Sorry Boss, command execute nahi ho paya.",
-    System.currentTimeMillis()
-)
-                                
-                            
-
-                            delay(1500L)
-
-                            if (voiceActive) {
-                                voiceController?.resumeListening()
-                            }
-                        }
-                    }
+                    executeCommand(command)
                 },
 
                 onDismiss = {
@@ -513,15 +457,366 @@ class WakeWordService : Service() {
         }
     }
 
+    /*
+     * ------------------------------------------------------------
+     * AI CONVERSATION
+     * ------------------------------------------------------------
+     *
+     * Flow:
+     *
+     * User speech
+     *     ↓
+     * Intent classifier
+     *     ↓
+     * this method
+     *     ↓
+     * VisionRepository
+     *     ↓
+     * Gemini / local fallback
+     *     ↓
+     * TtsManager
+     *     ↓
+     * resume listening
+     */
+    private fun handleAiConversation(
+        text: String
+    ) {
+
+        serviceScope.launch {
+
+            try {
+
+                if (!voiceActive) {
+                    return@launch
+                }
+
+                val repository =
+                    visionRepository
+
+                if (repository == null) {
+
+                    Log.e(
+                        TAG,
+                        "VisionRepository unavailable"
+                    )
+
+                    speakAndWait(
+                        "Sorry Boss, mera AI brain abhi available nahi hai."
+                    )
+
+                    return@launch
+                }
+
+                /*
+                 * Create one Room session for the current
+                 * wake-word conversation.
+                 */
+                val sessionId =
+                    voiceSessionId
+                        ?: repository
+                            .createNewSession(
+                                title = "Voice Conversation",
+                                engineId =
+                                    AiEngineType
+                                        .VISION_CORE
+                                        .id
+                            )
+                            .also {
+                                voiceSessionId = it
+                            }
+
+                Log.d(
+                    TAG,
+                    "Sending voice message. " +
+                        "sessionId=$sessionId"
+                )
+
+                val result =
+                    repository.sendMessage(
+                        sessionId = sessionId,
+                        userPrompt = text,
+                        engineType =
+                            AiEngineType
+                                .VISION_CORE,
+                        customApiKey = null,
+                        temperature = 0.7f
+                    )
+
+                if (!voiceActive) {
+                    return@launch
+                }
+
+                val assistantMessage =
+                    result.getOrNull()
+
+                if (
+                    assistantMessage == null ||
+                    assistantMessage.content
+                        .isBlank()
+                ) {
+
+                    Log.w(
+                        TAG,
+                        "AI returned empty response"
+                    )
+
+                    speakAndWait(
+                        "Sorry Boss, mujhe abhi proper response nahi mila."
+                    )
+
+                } else {
+
+                    Log.d(
+                        TAG,
+                        "AI response received: " +
+                            assistantMessage.content
+                    )
+
+                    /*
+                     * Existing Android TTS.
+                     * No Gemini TTS.
+                     */
+                    speakAndWait(
+                        assistantMessage.content
+                    )
+                }
+
+            } catch (e: Exception) {
+
+                Log.e(
+                    TAG,
+                    "AI conversation failed",
+                    e
+                )
+
+                if (voiceActive) {
+
+                    speakAndWait(
+                        "Sorry Boss, AI response generate nahi ho paya."
+                    )
+                }
+
+            } finally {
+
+                /*
+                 * IMPORTANT:
+                 *
+                 * Microphone starts again ONLY AFTER
+                 * AI processing and TTS are finished.
+                 */
+                if (voiceActive) {
+
+                    delay(250L)
+
+                    if (voiceActive) {
+
+                        Log.d(
+                            TAG,
+                            "AI response complete - " +
+                                "resuming listening"
+                        )
+
+                        mainHandler.post {
+
+                            if (voiceActive) {
+                                voiceController
+                                    ?.resumeListening()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /*
+     * ------------------------------------------------------------
+     * COMMAND EXECUTION
+     * ------------------------------------------------------------
+     *
+     * Existing action path remains separate from AI chat.
+     */
+    private fun executeCommand(
+        command: String
+    ) {
+
+        serviceScope.launch {
+
+            try {
+
+                val executor =
+                    commandExecutor
+
+                if (executor == null) {
+
+                    Log.e(
+                        TAG,
+                        "Command executor unavailable"
+                    )
+
+                    speakAndWait(
+                        "Boss, command executor available nahi hai."
+                    )
+
+                    return@launch
+                }
+
+                val result =
+                    executor.execute(command)
+
+                Log.d(
+                    TAG,
+                    "Command execution result: " +
+                        "success=${result.success}, " +
+                        "action=${result.action}, " +
+                        "message=${result.message}"
+                )
+
+                speakAndWait(
+                    result.message
+                )
+
+            } catch (e: Exception) {
+
+                Log.e(
+                    TAG,
+                    "Command execution failed",
+                    e
+                )
+
+                speakAndWait(
+                    "Sorry Boss, command execute nahi ho paya."
+                )
+
+            } finally {
+
+                delay(250L)
+
+                if (voiceActive) {
+
+                    mainHandler.post {
+
+                        if (voiceActive) {
+                            voiceController
+                                ?.resumeListening()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /*
+     * ------------------------------------------------------------
+     * ANDROID NATIVE TTS
+     * ------------------------------------------------------------
+     */
+    private suspend fun speakAndWait(
+        text: String
+    ) {
+
+        if (!voiceActive) {
+            return
+        }
+
+        val tts =
+            ttsManager
+
+        if (tts == null) {
+
+            Log.e(
+                TAG,
+                "TtsManager unavailable"
+            )
+
+            return
+        }
+
+        Log.d(
+            TAG,
+            "TTS start: [$text]"
+        )
+
+        tts.speak(
+            text,
+            -System.currentTimeMillis()
+        )
+
+        /*
+         * Wait until Android TTS actually starts.
+         */
+        val started =
+            withTimeoutOrNull(3000L) {
+
+                tts.isSpeaking
+                    .first { it }
+
+                true
+
+            } == true
+
+        if (started) {
+
+            Log.d(
+                TAG,
+                "TTS speaking"
+            )
+
+            /*
+             * Wait until Android TTS finishes.
+             *
+             * 30 seconds is intentionally generous because
+             * cloud responses can occasionally be longer.
+             */
+            withTimeoutOrNull(30000L) {
+
+                tts.isSpeaking
+                    .first { !it }
+            }
+
+            Log.d(
+                TAG,
+                "TTS finished"
+            )
+
+        } else {
+
+            /*
+             * If TtsManager doesn't expose the speaking state
+             * quickly enough, give it a small safety window.
+             */
+            Log.w(
+                TAG,
+                "TTS speaking state was not detected"
+            )
+
+            delay(1500L)
+        }
+    }
+
     private fun finishVoiceSession() {
 
         mainHandler.post {
 
+            Log.d(
+                TAG,
+                "Finishing voice session"
+            )
+
             voiceActive = false
 
+            /*
+             * Current wake-word conversation is over.
+             * Next "Hey Jarvis" gets a fresh voice session.
+             */
+            voiceSessionId = null
+
             try {
+
                 voiceController?.stop()
+
             } catch (e: Exception) {
+
                 Log.w(
                     TAG,
                     "Voice controller stop warning",
@@ -531,12 +826,6 @@ class WakeWordService : Service() {
 
             removeVisionOverlayNow()
 
-            /*
-             * Return to passive wake-word listening.
-             *
-             * Service has no isDestroyed property,
-             * so voiceActive is used as the lifecycle guard.
-             */
             if (!voiceActive) {
                 restartWakeWordDetection()
             }
@@ -547,7 +836,10 @@ class WakeWordService : Service() {
 
         mainHandler.post {
 
-            if (running || voiceActive) {
+            if (
+                running ||
+                voiceActive
+            ) {
                 return@post
             }
 
@@ -611,7 +903,10 @@ class WakeWordService : Service() {
 
     private fun scheduleRestart() {
 
-        if (restarting || voiceActive) {
+        if (
+            restarting ||
+            voiceActive
+        ) {
             return
         }
 
@@ -623,7 +918,10 @@ class WakeWordService : Service() {
                 RESTART_DELAY_MS
             )
 
-            if (!running && !voiceActive) {
+            if (
+                !running &&
+                !voiceActive
+            ) {
 
                 try {
                     wakeWordEngine?.stop()
@@ -663,10 +961,8 @@ class WakeWordService : Service() {
                 @Suppress("DEPRECATION")
                 val wakeLock =
                     powerManager.newWakeLock(
-
                         PowerManager.SCREEN_BRIGHT_WAKE_LOCK or
                             PowerManager.ACQUIRE_CAUSES_WAKEUP,
-
                         "Vision::WakeWordScreen"
                     )
 
@@ -741,7 +1037,7 @@ class WakeWordService : Service() {
                 resources
                     .displayMetrics
                     .density
-        ).toInt()
+            ).toInt()
     }
 
     override fun onTaskRemoved(
@@ -750,7 +1046,8 @@ class WakeWordService : Service() {
 
         Log.d(
             TAG,
-            "App task removed — Wake Word service remains active"
+            "App task removed — " +
+                "Wake Word service remains active"
         )
 
         super.onTaskRemoved(
@@ -768,6 +1065,7 @@ class WakeWordService : Service() {
         running = false
         restarting = false
         voiceActive = false
+        voiceSessionId = null
 
         detectionJob?.cancel()
         detectionJob = null
@@ -789,7 +1087,9 @@ class WakeWordService : Service() {
         }
 
         ttsManager = null
+
         commandExecutor = null
+        visionRepository = null
 
         removeVisionOverlayNow()
 
