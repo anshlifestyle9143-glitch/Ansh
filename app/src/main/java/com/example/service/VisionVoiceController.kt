@@ -314,6 +314,8 @@ class VisionVoiceController(
                         )
 
                         onConversationCallback(text)
+
+                        resumeListening()
                     }
 
                     VisionIntentClassifier.IntentType.QUESTION -> {
@@ -324,6 +326,8 @@ class VisionVoiceController(
                         )
 
                         onConversationCallback(text)
+
+                        resumeListening()
                     }
 
                     VisionIntentClassifier.IntentType.SEARCH -> {
@@ -334,6 +338,8 @@ class VisionVoiceController(
                         )
 
                         onConversationCallback(text)
+
+                        resumeListening()
                     }
 
                     VisionIntentClassifier.IntentType.UNCLEAR -> {
