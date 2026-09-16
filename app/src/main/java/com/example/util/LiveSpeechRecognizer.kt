@@ -124,14 +124,11 @@ class LiveSpeechRecognizer(
 
                                 onListeningChange(false)
 
-                                if (!continuousMode) {
-                                    scheduleFinishWatchdog(
-                                        currentSession,
-                                        onFinal,
-                                        onError
-                                    )
-                                }
-                            }
+                                scheduleFinishWatchdog(
+                                    currentSession,
+                                    onFinal,
+                                    onError
+                                )
 
                             override fun onError(
                                 error: Int
