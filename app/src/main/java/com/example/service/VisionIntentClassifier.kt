@@ -37,7 +37,7 @@ class VisionIntentClassifier {
     companion object {
         private const val TAG = "VisionIntentClassifier"
 
-        private const val MODEL = "gemini-3.5-flash"
+        private const val MODEL = "gemini-3.5-flash-lite"
 
         private const val ACTION = "ACTION"
         private const val CONVERSATION = "CONVERSATION"
