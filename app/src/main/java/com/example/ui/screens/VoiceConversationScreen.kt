@@ -609,42 +609,44 @@ private fun NeuralVoiceScreen(
         state != VoiceCallState.IDLE &&
             state != VoiceCallState.NO_PERMISSION
 
-    val title =
+    // Big status word shown bottom-left, over the brain (e.g. "Thinking...")
+    val statusWord =
         when (state) {
 
             VoiceCallState.LISTENING ->
-                "LISTENING"
-
-            VoiceCallState.THINKING ->
-                "THINKING"
-
-            VoiceCallState.SPEAKING ->
-                "RESPONDING"
-
-            VoiceCallState.IDLE ->
-                "VISION READY"
-
-            VoiceCallState.NO_PERMISSION ->
-                "MICROPHONE ACCESS"
-        }
-
-    val subtitle =
-        when (state) {
-
-            VoiceCallState.LISTENING ->
-                "Sun rahi hoon..."
+                "Listening..."
 
             VoiceCallState.THINKING ->
                 "Thinking..."
 
             VoiceCallState.SPEAKING ->
-                "Bol rahi hoon..."
+                "Responding..."
 
             VoiceCallState.IDLE ->
-                "Ready"
+                "Vision ready"
 
             VoiceCallState.NO_PERMISSION ->
-                "Microphone permission required"
+                "Mic access needed"
+        }
+
+    // Small description line under the status word.
+    val statusDescription =
+        when (state) {
+
+            VoiceCallState.LISTENING ->
+                "Your voice is being\ncaptured in real-time."
+
+            VoiceCallState.THINKING ->
+                "Your voice is being\nprocessed in real-time."
+
+            VoiceCallState.SPEAKING ->
+                "Vision is replying\nto you right now."
+
+            VoiceCallState.IDLE ->
+                "Tap the mic below\nto start talking."
+
+            VoiceCallState.NO_PERMISSION ->
+                "Allow microphone access\nto talk with Vision."
         }
 
     val activeStage =
@@ -705,290 +707,384 @@ private fun NeuralVoiceScreen(
                     )
         )
 
-        /* ----------------------------------------------------
-         * HEADER
-         * ---------------------------------------------------- */
-
-        Row(
+        Column(
             modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(
-                        start = 10.dp,
-                        end = 18.dp,
-                        top = 14.dp
-                    ),
-            verticalAlignment =
-                Alignment.CenterVertically
+                Modifier.fillMaxSize()
         ) {
 
-            IconButton(
-                onClick = onExit,
+            /* ------------------------------------------------
+             * HEADER ROW: close (left) + mic status (right)
+             * ------------------------------------------------ */
+
+            Row(
                 modifier =
-                    Modifier.size(48.dp)
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            start = 6.dp,
+                            end = 20.dp,
+                            top = 10.dp
+                        ),
+                verticalAlignment =
+                    Alignment.CenterVertically
             ) {
 
-                Icon(
-                    imageVector =
-                        Icons.Default.Close,
-                    contentDescription =
-                        "Close voice mode",
-                    tint =
-                        Color.White,
+                IconButton(
+                    onClick = onExit,
                     modifier =
-                        Modifier.size(30.dp)
-                )
-            }
+                        Modifier.size(44.dp)
+                ) {
 
-            Column(
-                modifier =
-                    Modifier.weight(1f),
-                horizontalAlignment =
-                    Alignment.CenterHorizontally
-            ) {
-
-                Text(
-                    text = "VISION",
-                    color = Color.White,
-                    fontSize = 15.sp,
-                    letterSpacing = 4.sp
-                )
+                    Icon(
+                        imageVector =
+                            Icons.Default.Close,
+                        contentDescription =
+                            "Close voice mode",
+                        tint =
+                            Color.White,
+                        modifier =
+                            Modifier.size(26.dp)
+                    )
+                }
 
                 Spacer(
                     modifier =
-                        Modifier.height(3.dp)
+                        Modifier.weight(1f)
                 )
 
-                Text(
-                    text = "BY ANSH YADAV",
-                    color =
-                        Color(0xFF70758B),
-                    fontSize = 8.sp,
-                    letterSpacing = 2.5.sp
+                Icon(
+                    imageVector =
+                        Icons.Default.Mic,
+                    contentDescription =
+                        "Microphone status",
+                    tint =
+                        if (
+                            state ==
+                                VoiceCallState.NO_PERMISSION
+                        ) {
+                            Color(0xFFFF5268)
+                        } else {
+                            Color(0xFF54E39B)
+                        },
+                    modifier =
+                        Modifier.size(20.dp)
                 )
             }
+
+            /* ------------------------------------------------
+             * LOGO (left) + UNDERSTAND/ANALYZE/RESPOND (right)
+             * ------------------------------------------------ */
+
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            horizontal = 22.dp,
+                            vertical = 6.dp
+                        ),
+                verticalAlignment =
+                    Alignment.Top,
+                horizontalArrangement =
+                    Arrangement.SpaceBetween
+            ) {
+
+                VisionLogoLockup()
+
+                PipelineSidebar(
+                    activeStage = activeStage
+                )
+            }
+
+            /* ------------------------------------------------
+             * BRAIN + status text, sharing the remaining space
+             * ------------------------------------------------ */
 
             Box(
                 modifier =
                     Modifier
-                        .size(9.dp)
-                        .clip(CircleShape)
-                        .background(
-                            if (
-                                state ==
-                                    VoiceCallState.NO_PERMISSION
-                            ) {
-                                Color(0xFFFF5268)
-                            } else {
-                                Color(0xFF54E39B)
-                            }
-                        )
-            )
-        }
+                        .weight(1f)
+                        .fillMaxWidth()
+            ) {
 
-        /* ----------------------------------------------------
-         * TITLE
-         * ---------------------------------------------------- */
+                Canvas(
+                    modifier =
+                        Modifier
+                            .align(Alignment.Center)
+                            .size(300.dp)
+                ) {
 
-        Column(
-            modifier =
-                Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 98.dp),
-            horizontalAlignment =
-                Alignment.CenterHorizontally
-        ) {
+                    drawNeuralBrain(
+                        flow = flow,
+                        pulse = pulse,
+                        active = active,
+                        thinking =
+                            state ==
+                                VoiceCallState.THINKING,
+                        speaking =
+                            state ==
+                                VoiceCallState.SPEAKING
+                    )
+                }
 
-            Text(
-                text = title,
-                color =
-                    when (state) {
+                Column(
+                    modifier =
+                        Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(
+                                start = 24.dp,
+                                bottom = 4.dp,
+                                end = 24.dp
+                            )
+                ) {
 
-                        VoiceCallState.LISTENING ->
-                            Color(0xFF70A8FF)
+                    Text(
+                        text = statusWord,
+                        color =
+                            Color(0xFFF2F1F7),
+                        fontSize = 26.sp
+                    )
 
-                        VoiceCallState.THINKING ->
-                            Color(0xFFB17BFF)
+                    Spacer(
+                        modifier =
+                            Modifier.height(6.dp)
+                    )
 
-                        VoiceCallState.SPEAKING ->
-                            Color(0xFF6B8EFF)
+                    Text(
+                        text = statusDescription,
+                        color =
+                            when (state) {
 
-                        else ->
-                            Color(0xFF7B8093)
-                    },
-                fontSize = 11.sp,
-                letterSpacing = 3.5.sp
+                                VoiceCallState.THINKING ->
+                                    Color(0xFFB2A8FF)
+
+                                VoiceCallState.SPEAKING ->
+                                    Color(0xFF9AB4FF)
+
+                                else ->
+                                    Color(0xFF8E9AD9)
+                            },
+                        fontSize = 12.5.sp,
+                        lineHeight = 16.sp
+                    )
+                }
+            }
+
+            /* ------------------------------------------------
+             * WAVEFORM
+             * ------------------------------------------------ */
+
+            NeuralWaveform(
+                active =
+                    state ==
+                        VoiceCallState.LISTENING ||
+                    state ==
+                        VoiceCallState.THINKING ||
+                    state ==
+                        VoiceCallState.SPEAKING,
+
+                thinking =
+                    state ==
+                        VoiceCallState.THINKING,
+
+                speaking =
+                    state ==
+                        VoiceCallState.SPEAKING,
+
+                flow = flow,
+
+                modifier =
+                    Modifier.fillMaxWidth()
             )
 
             Spacer(
                 modifier =
-                    Modifier.height(9.dp)
+                    Modifier.height(10.dp)
             )
 
-            Text(
-                text = subtitle,
-                color =
-                    Color(0xFFF2F1F7),
-                fontSize = 22.sp
-            )
-        }
-
-        /* ----------------------------------------------------
-         * BRAIN
-         * ---------------------------------------------------- */
-
-        Box(
-            modifier =
-                Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 280.dp)
-                    .size(320.dp)
-        ) {
-
-            Canvas(
+            PaginationDots(
+                activeStage = activeStage,
                 modifier =
-                    Modifier.fillMaxSize()
-            ) {
+                    Modifier
+                        .align(Alignment.CenterHorizontally)
+            )
 
-                drawNeuralBrain(
-                    flow = flow,
-                    pulse = pulse,
-                    active = active,
-                    thinking =
-                        state ==
-                            VoiceCallState.THINKING,
-                    speaking =
-                        state ==
-                            VoiceCallState.SPEAKING
-                )
-            }
+            Spacer(
+                modifier =
+                    Modifier.height(14.dp)
+            )
+
+            /* ------------------------------------------------
+             * BOTTOM CONTROL
+             * ------------------------------------------------ */
+
+            VoiceBottomControl(
+                state = state,
+                onMicClick = onMicClick,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            start = 20.dp,
+                            end = 20.dp,
+                            bottom = 18.dp
+                        )
+            )
         }
-
-        /* ----------------------------------------------------
-         * PIPELINE
-         * ---------------------------------------------------- */
-
-        ProcessingPipeline(
-            activeStage = activeStage,
-            modifier =
-                Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 592.dp)
-        )
-
-        /* ----------------------------------------------------
-         * WAVEFORM
-         * ---------------------------------------------------- */
-
-        NeuralWaveform(
-            active =
-                state ==
-                    VoiceCallState.LISTENING ||
-                state ==
-                    VoiceCallState.THINKING ||
-                state ==
-                    VoiceCallState.SPEAKING,
-
-            thinking =
-                state ==
-                    VoiceCallState.THINKING,
-
-            speaking =
-                state ==
-                    VoiceCallState.SPEAKING,
-
-            flow = flow,
-
-            modifier =
-                Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 642.dp)
-        )
-
-        /* ----------------------------------------------------
-         * BOTTOM CONTROL
-         * ---------------------------------------------------- */
-
-        VoiceBottomControl(
-            state = state,
-            onMicClick = onMicClick,
-            modifier =
-                Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(
-                        start = 20.dp,
-                        end = 20.dp,
-                        bottom = 18.dp
-                    )
-        )
     }
 }
 
 
 /* ============================================================
- * PROCESSING PIPELINE
+ * LOGO LOCKUP  ("V" badge + VISION / BY ANSH YADAV)
  * ============================================================ */
 
 @Composable
-private fun ProcessingPipeline(
-    activeStage: Int,
-    modifier: Modifier
+private fun VisionLogoLockup(
+    modifier: Modifier = Modifier
 ) {
 
     Row(
         modifier = modifier,
         verticalAlignment =
-            Alignment.CenterVertically,
-        horizontalArrangement =
-            Arrangement.Center
+            Alignment.CenterVertically
     ) {
 
-        PipelineItem(
-            label = "UNDERSTAND",
-            active =
-                activeStage == 0,
-            passed =
-                activeStage > 0
+        Box(
+            modifier =
+                Modifier
+                    .size(30.dp)
+                    .clip(CircleShape)
+                    .background(
+                        Brush.radialGradient(
+                            colors =
+                                listOf(
+                                    Color(0xFF5C7FFF),
+                                    Color(0xFF1B1C36)
+                                )
+                        )
+                    ),
+            contentAlignment =
+                Alignment.Center
+        ) {
+
+            Text(
+                text = "V",
+                color = Color.White,
+                fontSize = 14.sp
+            )
+        }
+
+        Spacer(
+            modifier =
+                Modifier.width(9.dp)
         )
 
-        PipelineLine(
-            active =
-                activeStage >= 1
+        Column {
+
+            Text(
+                text = "VISION",
+                color = Color.White,
+                fontSize = 13.sp,
+                letterSpacing = 3.sp
+            )
+
+            Spacer(
+                modifier =
+                    Modifier.height(2.dp)
+            )
+
+            Text(
+                text = "BY ANSH YADAV",
+                color =
+                    Color(0xFF70758B),
+                fontSize = 7.sp,
+                letterSpacing = 1.8.sp
+            )
+        }
+    }
+}
+
+
+/* ============================================================
+ * PIPELINE SIDEBAR (Understand / Analyze / Respond)
+ * ============================================================ */
+
+@Composable
+private fun PipelineSidebar(
+    activeStage: Int,
+    modifier: Modifier = Modifier
+) {
+
+    Column(
+        modifier = modifier,
+        horizontalAlignment =
+            Alignment.End
+    ) {
+
+        SidebarItem(
+            label = "Understand",
+            active = activeStage == 0,
+            passed = activeStage > 0
         )
 
-        PipelineItem(
-            label = "ANALYZE",
-            active =
-                activeStage == 1,
-            passed =
-                activeStage > 1
+        Spacer(
+            modifier =
+                Modifier.height(9.dp)
         )
 
-        PipelineLine(
-            active =
-                activeStage >= 2
+        SidebarItem(
+            label = "Analyze",
+            active = activeStage == 1,
+            passed = activeStage > 1
         )
 
-        PipelineItem(
-            label = "RESPOND",
-            active =
-                activeStage == 2,
+        Spacer(
+            modifier =
+                Modifier.height(9.dp)
+        )
+
+        SidebarItem(
+            label = "Respond",
+            active = activeStage == 2,
             passed = false
         )
     }
 }
 
 @Composable
-private fun PipelineItem(
+private fun SidebarItem(
     label: String,
     active: Boolean,
     passed: Boolean
 ) {
 
-    Column(
-        horizontalAlignment =
-            Alignment.CenterHorizontally
+    Row(
+        verticalAlignment =
+            Alignment.CenterVertically
     ) {
+
+        Text(
+            text = label,
+            color =
+                when {
+
+                    active ->
+                        Color(0xFFE7E8F1)
+
+                    passed ->
+                        Color(0xFF6C7084)
+
+                    else ->
+                        Color(0xFF9296A6)
+                },
+            fontSize = 12.sp
+        )
+
+        Spacer(
+            modifier =
+                Modifier.width(8.dp)
+        )
 
         Box(
             modifier =
@@ -1015,53 +1111,53 @@ private fun PipelineItem(
                         }
                     )
         )
-
-        Spacer(
-            modifier =
-                Modifier.height(7.dp)
-        )
-
-        Text(
-            text = label,
-            color =
-                when {
-
-                    active ->
-                        Color(0xFFE7E8F1)
-
-                    passed ->
-                        Color(0xFF6C7084)
-
-                    else ->
-                        Color(0xFF444754)
-                },
-            fontSize = 8.sp,
-            letterSpacing = 1.35.sp
-        )
     }
 }
 
+
+/* ============================================================
+ * PAGINATION DOTS (decorative, mirrors the reference carousel)
+ * ============================================================ */
+
 @Composable
-private fun PipelineLine(
-    active: Boolean
+private fun PaginationDots(
+    activeStage: Int,
+    modifier: Modifier = Modifier
 ) {
 
-    Box(
-        modifier =
-            Modifier
-                .padding(
-                    horizontal = 10.dp
-                )
-                .width(38.dp)
-                .height(1.dp)
-                .background(
-                    if (active) {
-                        Color(0xFF596E99)
-                    } else {
-                        Color(0xFF292B38)
-                    }
-                )
-    )
+    val dotCount = 4
+    val highlighted =
+        activeStage.coerceIn(0, dotCount - 1)
+
+    Row(
+        modifier = modifier,
+        horizontalArrangement =
+            Arrangement.spacedBy(6.dp)
+    ) {
+
+        for (i in 0 until dotCount) {
+
+            Box(
+                modifier =
+                    Modifier
+                        .size(
+                            if (i == highlighted) {
+                                6.dp
+                            } else {
+                                4.dp
+                            }
+                        )
+                        .clip(CircleShape)
+                        .background(
+                            if (i == highlighted) {
+                                Color(0xFF7B93E0)
+                            } else {
+                                Color(0xFF33364A)
+                            }
+                        )
+            )
+        }
+    }
 }
 
 
@@ -2084,7 +2180,7 @@ private fun VoiceBottomControl(
 
         shape =
             RoundedCornerShape(
-                24.dp
+                28.dp
             ),
 
         color =
@@ -2107,15 +2203,47 @@ private fun VoiceBottomControl(
                 Modifier
                     .fillMaxWidth()
                     .padding(
-                        start = 17.dp,
+                        start = 10.dp,
                         end = 10.dp,
-                        top = 10.dp,
-                        bottom = 10.dp
+                        top = 8.dp,
+                        bottom = 8.dp
                     ),
 
             verticalAlignment =
                 Alignment.CenterVertically
         ) {
+
+            /* ------------------------------------------------
+             * Small mic glyph on the LEFT, matching reference.
+             * ------------------------------------------------ */
+
+            Box(
+                modifier =
+                    Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(
+                            Color(0xFF1A1C29)
+                        ),
+                contentAlignment =
+                    Alignment.Center
+            ) {
+
+                Icon(
+                    imageVector =
+                        Icons.Default.Mic,
+                    contentDescription = null,
+                    tint =
+                        Color(0xFFC7CBDA),
+                    modifier =
+                        Modifier.size(18.dp)
+                )
+            }
+
+            Spacer(
+                modifier =
+                    Modifier.width(12.dp)
+            )
 
             Column(
                 modifier =
@@ -2123,16 +2251,33 @@ private fun VoiceBottomControl(
             ) {
 
                 Text(
-                    text = "VISION",
-                    color =
-                        Color.White,
-                    fontSize = 15.sp,
-                    letterSpacing = 1.8.sp
+                    text =
+                        when (state) {
+
+                            VoiceCallState.LISTENING ->
+                                "Tap to stop"
+
+                            VoiceCallState.THINKING ->
+                                "Processing your voice"
+
+                            VoiceCallState.SPEAKING ->
+                                "Vision is speaking"
+
+                            VoiceCallState.IDLE ->
+                                "Tap to start"
+
+                            VoiceCallState.NO_PERMISSION ->
+                                "Microphone permission required"
+                        },
+
+                    color = Color.White,
+
+                    fontSize = 14.sp
                 )
 
                 Spacer(
                     modifier =
-                        Modifier.height(3.dp)
+                        Modifier.height(2.dp)
                 )
 
                 Text(
@@ -2143,16 +2288,16 @@ private fun VoiceBottomControl(
                                 "Listening in real-time"
 
                             VoiceCallState.THINKING ->
-                                "Processing your voice"
+                                "Your voice is being processed"
 
                             VoiceCallState.SPEAKING ->
-                                "Vision is speaking"
+                                "Reply in progress"
 
                             VoiceCallState.IDLE ->
                                 "Ready to listen"
 
                             VoiceCallState.NO_PERMISSION ->
-                                "Microphone permission required"
+                                "Grant access to continue"
                         },
 
                     color =
@@ -2163,7 +2308,7 @@ private fun VoiceBottomControl(
             }
 
             /* ------------------------------------------------
-             * Mic control stays on RIGHT.
+             * Mic / Stop control stays on RIGHT.
              * ------------------------------------------------ */
 
             Box(
