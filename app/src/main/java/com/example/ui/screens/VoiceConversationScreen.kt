@@ -9,6 +9,8 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -40,31 +43,31 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.example.service.VisionCommandExecutor
 import com.example.service.VisionIntentClassifier
-import com.example.ui.theme.VisionBackground
-import com.example.ui.theme.VisionDeepPlum
-import com.example.ui.theme.VisionEmerald
-import com.example.ui.theme.VisionIndigo
-import com.example.ui.theme.VisionTextPrimary
-import com.example.ui.theme.VisionTextSecondary
 import com.example.ui.viewmodel.VisionViewModel
 import com.example.util.LiveSpeechRecognizer
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.sqrt
 
 private enum class VoiceCallState {
     IDLE,
@@ -99,7 +102,7 @@ fun VoiceConversationScreen(
         mutableStateOf(false)
     }
 
-    val coroutineScope = rememberCoroutineScope()
+    val scope = rememberCoroutineScope()
 
     val speechRecognizer = remember {
         LiveSpeechRecognizer(context)
@@ -108,9 +111,7 @@ fun VoiceConversationScreen(
     fun startListening() {
 
         if (!active) return
-
         if (listeningStarted) return
-
         if (isGenerating || isSpeaking) return
 
         listeningStarted = true
@@ -118,9 +119,7 @@ fun VoiceConversationScreen(
         speechRecognizer.start(
 
             onPartial = {
-                /*
-                 * Partial speech intentionally hidden.
-                 */
+                // Partial text intentionally hidden.
             },
 
             onFinal = { text ->
@@ -131,30 +130,21 @@ fun VoiceConversationScreen(
 
                 listeningStarted = false
 
-                val cleanText =
-                    text.trim()
+                val cleanText = text.trim()
 
                 if (cleanText.isBlank()) {
-
-                    callState =
-                        VoiceCallState.IDLE
-
+                    callState = VoiceCallState.IDLE
                     return@start
                 }
 
-                coroutineScope.launch {
+                scope.launch {
 
                     val intentType =
                         try {
-
                             VisionIntentClassifier()
-                                .classify(
-                                    cleanText
-                                )
+                                .classify(cleanText)
                                 .type
-
                         } catch (e: Exception) {
-
                             VisionIntentClassifier
                                 .IntentType
                                 .CONVERSATION
@@ -167,8 +157,7 @@ fun VoiceConversationScreen(
                     when (intentType) {
 
                         VisionIntentClassifier
-                            .IntentType
-                            .ACTION -> {
+                            .IntentType.ACTION -> {
 
                             callState =
                                 VoiceCallState.SPEAKING
@@ -178,10 +167,8 @@ fun VoiceConversationScreen(
                                 -System.currentTimeMillis()
                             )
 
-                            val okBossStarted =
-                                withTimeoutOrNull(
-                                    3000L
-                                ) {
+                            val started =
+                                withTimeoutOrNull(3000L) {
 
                                     viewModel
                                         .ttsManager
@@ -189,14 +176,11 @@ fun VoiceConversationScreen(
                                         .first { it }
 
                                     true
-
                                 } == true
 
-                            if (okBossStarted) {
+                            if (started) {
 
-                                withTimeoutOrNull(
-                                    10000L
-                                ) {
+                                withTimeoutOrNull(10000L) {
 
                                     viewModel
                                         .ttsManager
@@ -212,11 +196,6 @@ fun VoiceConversationScreen(
                             callState =
                                 VoiceCallState.THINKING
 
-                            /*
-                             * ---------------------------------------
-                             * ACTUALLY EXECUTE THE DEVICE COMMAND
-                             * ---------------------------------------
-                             */
                             val result =
                                 try {
 
@@ -246,9 +225,7 @@ fun VoiceConversationScreen(
                             )
 
                             val resultStarted =
-                                withTimeoutOrNull(
-                                    3000L
-                                ) {
+                                withTimeoutOrNull(3000L) {
 
                                     viewModel
                                         .ttsManager
@@ -256,14 +233,11 @@ fun VoiceConversationScreen(
                                         .first { it }
 
                                     true
-
                                 } == true
 
                             if (resultStarted) {
 
-                                withTimeoutOrNull(
-                                    10000L
-                                ) {
+                                withTimeoutOrNull(10000L) {
 
                                     viewModel
                                         .ttsManager
@@ -284,50 +258,43 @@ fun VoiceConversationScreen(
                         }
 
                         VisionIntentClassifier
-                            .IntentType
-                            .CONVERSATION -> {
+                            .IntentType.CONVERSATION -> {
 
                             callState =
                                 VoiceCallState.THINKING
 
                             viewModel.sendMessage(
-                                overridePrompt =
-                                    cleanText,
+                                overridePrompt = cleanText,
                                 autoSpeak = true
                             )
                         }
 
                         VisionIntentClassifier
-                            .IntentType
-                            .QUESTION -> {
+                            .IntentType.QUESTION -> {
 
                             callState =
                                 VoiceCallState.THINKING
 
                             viewModel.sendMessage(
-                                overridePrompt =
-                                    cleanText,
+                                overridePrompt = cleanText,
                                 autoSpeak = true
                             )
                         }
 
                         VisionIntentClassifier
-                            .IntentType
-                            .SEARCH -> {
+                            .IntentType.SEARCH -> {
 
                             callState =
                                 VoiceCallState.THINKING
 
                             viewModel.sendMessage(
-                                overridePrompt =
-                                    cleanText,
+                                overridePrompt = cleanText,
                                 autoSpeak = true
                             )
                         }
 
                         VisionIntentClassifier
-                            .IntentType
-                            .UNCLEAR -> {
+                            .IntentType.UNCLEAR -> {
 
                             callState =
                                 VoiceCallState.SPEAKING
@@ -337,9 +304,7 @@ fun VoiceConversationScreen(
                                 -System.currentTimeMillis()
                             )
 
-                            withTimeoutOrNull(
-                                10000L
-                            ) {
+                            withTimeoutOrNull(10000L) {
 
                                 viewModel
                                     .ttsManager
@@ -353,11 +318,9 @@ fun VoiceConversationScreen(
 
                             delay(300L)
 
-                            if (!active) {
-                                return@launch
+                            if (active) {
+                                startListening()
                             }
-
-                            startListening()
                         }
                     }
                 }
@@ -375,9 +338,6 @@ fun VoiceConversationScreen(
 
                     callState =
                         VoiceCallState.LISTENING
-
-                } else {
-                    // Final result/error controls state.
                 }
             },
 
@@ -388,9 +348,7 @@ fun VoiceConversationScreen(
                 }
 
                 listeningStarted = false
-
-                callState =
-                    VoiceCallState.IDLE
+                callState = VoiceCallState.IDLE
             },
 
             continuous = true
@@ -408,37 +366,27 @@ fun VoiceConversationScreen(
             }
 
             if (granted) {
-
                 startListening()
-
             } else {
-
                 listeningStarted = false
-
-                callState =
-                    VoiceCallState.NO_PERMISSION
+                callState = VoiceCallState.NO_PERMISSION
             }
         }
 
     fun requestListening() {
 
         if (!active) return
-
         if (isGenerating || isSpeaking) return
 
         val hasPermission =
             ContextCompat.checkSelfPermission(
                 context,
                 Manifest.permission.RECORD_AUDIO
-            ) ==
-                PackageManager.PERMISSION_GRANTED
+            ) == PackageManager.PERMISSION_GRANTED
 
         if (hasPermission) {
-
             startListening()
-
         } else {
-
             permissionLauncher.launch(
                 Manifest.permission.RECORD_AUDIO
             )
@@ -459,20 +407,29 @@ fun VoiceConversationScreen(
 
     val cameraPermissionLauncher =
         rememberLauncherForActivityResult(
-            contract = ActivityResultContracts.RequestPermission()
+            contract =
+                ActivityResultContracts.RequestPermission()
         ) {}
 
     LaunchedEffect(Unit) {
+
         if (
             ContextCompat.checkSelfPermission(
                 context,
                 Manifest.permission.CAMERA
             ) != PackageManager.PERMISSION_GRANTED
         ) {
-            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+
+            cameraPermissionLauncher.launch(
+                Manifest.permission.CAMERA
+            )
         }
     }
 
+    /*
+     * Initial voice greeting.
+     * Uses native TtsManager.
+     */
     LaunchedEffect(Unit) {
 
         callState =
@@ -483,10 +440,8 @@ fun VoiceConversationScreen(
             -System.currentTimeMillis()
         )
 
-        val yesBossStarted =
-            withTimeoutOrNull(
-                3000L
-            ) {
+        val started =
+            withTimeoutOrNull(3000L) {
 
                 viewModel
                     .ttsManager
@@ -494,14 +449,11 @@ fun VoiceConversationScreen(
                     .first { it }
 
                 true
-
             } == true
 
-        if (yesBossStarted) {
+        if (started) {
 
-            withTimeoutOrNull(
-                10000L
-            ) {
+            withTimeoutOrNull(10000L) {
 
                 viewModel
                     .ttsManager
@@ -517,6 +469,9 @@ fun VoiceConversationScreen(
         }
     }
 
+    /*
+     * AI generation state.
+     */
     LaunchedEffect(isGenerating) {
 
         if (!active) {
@@ -531,9 +486,24 @@ fun VoiceConversationScreen(
                 VoiceCallState.THINKING
 
             speechRecognizer.stop()
+
+        } else {
+
+            delay(200L)
+
+            if (
+                active &&
+                !isGenerating &&
+                !isSpeaking
+            ) {
+                requestListening()
+            }
         }
     }
 
+    /*
+     * Native TTS state.
+     */
     LaunchedEffect(isSpeaking) {
 
         if (!active) {
@@ -568,405 +538,536 @@ fun VoiceConversationScreen(
         }
     }
 
-    LaunchedEffect(isGenerating) {
+    NeuralVoiceScreen(
+        state = callState,
+        onExit = {
 
-        if (!active) {
-            return@LaunchedEffect
-        }
-
-        if (isGenerating) {
-
-            callState =
-                VoiceCallState.THINKING
+            active = false
+            listeningStarted = false
 
             speechRecognizer.stop()
+            speechRecognizer.destroy()
 
-        } else {
-
-            delay(200L)
-
-            if (
-                active &&
-                !isGenerating &&
-                !isSpeaking
-            ) {
-                requestListening()
-            }
+            onExit()
+        },
+        onMicClick = {
+            requestListening()
         }
-    }
-
-
-    val infiniteTransition =
-        rememberInfiniteTransition(label = "neural_interface")
-
-    val flow by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(3200),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "neural_flow"
     )
+}
 
-    val pulse by infiniteTransition.animateFloat(
-        initialValue = 0.96f,
-        targetValue = 1.04f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1050),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "brain_pulse"
-    )
 
-    val stateTitle = when (callState) {
-        VoiceCallState.LISTENING -> "LISTENING"
-        VoiceCallState.THINKING -> "THINKING"
-        VoiceCallState.SPEAKING -> "RESPONDING"
-        VoiceCallState.IDLE -> "VISION READY"
-        VoiceCallState.NO_PERMISSION -> "MICROPHONE ACCESS"
-    }
+/* ============================================================
+ * MAIN NEURAL VOICE UI
+ * ============================================================ */
 
-    val stateSubtitle = when (callState) {
-        VoiceCallState.LISTENING -> "Sun rahi hoon..."
-        VoiceCallState.THINKING -> "Thinking..."
-        VoiceCallState.SPEAKING -> "Bol rahi hoon..."
-        VoiceCallState.IDLE -> "Ready"
-        VoiceCallState.NO_PERMISSION -> "Microphone permission required"
-    }
+@Composable
+private fun NeuralVoiceScreen(
+    state: VoiceCallState,
+    onExit: () -> Unit,
+    onMicClick: () -> Unit
+) {
 
-    val activeStage = when (callState) {
-        VoiceCallState.LISTENING -> 0
-        VoiceCallState.THINKING -> 1
-        VoiceCallState.SPEAKING -> 2
-        else -> -1
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0xFF020208),
-                        Color(0xFF040510),
-                        Color(0xFF05040D),
-                        Color(0xFF020207)
-                    )
-                )
-            )
-    ) {
-
-        // Very restrained ambient light. The interface should stay almost black.
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(
-                            Color(0xFF253D93).copy(alpha = 0.13f),
-                            Color(0xFF301A66).copy(alpha = 0.07f),
-                            Color.Transparent
-                        ),
-                        radius = 900f
-                    )
-                )
+    val transition =
+        rememberInfiniteTransition(
+            label = "vision_neural_motion"
         )
 
-        /* =====================================================
-         * HEADER
-         * ===================================================== */
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(
-                    start = 11.dp,
-                    end = 18.dp,
-                    top = 16.dp
+    val flow by
+        transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec =
+                infiniteRepeatable(
+                    animation =
+                        tween(
+                            durationMillis = 3200
+                        ),
+                    repeatMode =
+                        RepeatMode.Restart
                 ),
-            verticalAlignment = Alignment.CenterVertically
+            label = "brain_flow"
+        )
+
+    val pulse by
+        transition.animateFloat(
+            initialValue = 0.96f,
+            targetValue = 1.04f,
+            animationSpec =
+                infiniteRepeatable(
+                    animation =
+                        tween(
+                            durationMillis = 1100
+                        ),
+                    repeatMode =
+                        RepeatMode.Reverse
+                ),
+            label = "brain_pulse"
+        )
+
+    val active =
+        state != VoiceCallState.IDLE &&
+            state != VoiceCallState.NO_PERMISSION
+
+    val title =
+        when (state) {
+
+            VoiceCallState.LISTENING ->
+                "LISTENING"
+
+            VoiceCallState.THINKING ->
+                "THINKING"
+
+            VoiceCallState.SPEAKING ->
+                "RESPONDING"
+
+            VoiceCallState.IDLE ->
+                "VISION READY"
+
+            VoiceCallState.NO_PERMISSION ->
+                "MICROPHONE ACCESS"
+        }
+
+    val subtitle =
+        when (state) {
+
+            VoiceCallState.LISTENING ->
+                "Sun rahi hoon..."
+
+            VoiceCallState.THINKING ->
+                "Thinking..."
+
+            VoiceCallState.SPEAKING ->
+                "Bol rahi hoon..."
+
+            VoiceCallState.IDLE ->
+                "Ready"
+
+            VoiceCallState.NO_PERMISSION ->
+                "Microphone permission required"
+        }
+
+    val activeStage =
+        when (state) {
+
+            VoiceCallState.LISTENING ->
+                0
+
+            VoiceCallState.THINKING ->
+                1
+
+            VoiceCallState.SPEAKING ->
+                2
+
+            else ->
+                -1
+        }
+
+    Box(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors =
+                            listOf(
+                                Color(0xFF020207),
+                                Color(0xFF04040C),
+                                Color(0xFF05040D),
+                                Color(0xFF020207)
+                            )
+                    )
+                )
+    ) {
+
+        /* ----------------------------------------------------
+         * Very subtle ambient light
+         * ---------------------------------------------------- */
+
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.radialGradient(
+                            colors =
+                                listOf(
+                                    Color(0xFF263D91)
+                                        .copy(alpha = 0.10f),
+
+                                    Color(0xFF351A68)
+                                        .copy(alpha = 0.06f),
+
+                                    Color.Transparent
+                                ),
+                            radius = 850f
+                        )
+                    )
+        )
+
+        /* ----------------------------------------------------
+         * HEADER
+         * ---------------------------------------------------- */
+
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        start = 10.dp,
+                        end = 18.dp,
+                        top = 14.dp
+                    ),
+            verticalAlignment =
+                Alignment.CenterVertically
         ) {
+
             IconButton(
-                onClick = {
-                    active = false
-                    listeningStarted = false
-                    speechRecognizer.stop()
-                    speechRecognizer.destroy()
-                    onExit()
-                },
-                modifier = Modifier.size(48.dp)
+                onClick = onExit,
+                modifier =
+                    Modifier.size(48.dp)
             ) {
+
                 Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = "End voice mode",
-                    tint = Color.White,
-                    modifier = Modifier.size(30.dp)
+                    imageVector =
+                        Icons.Default.Close,
+                    contentDescription =
+                        "Close voice mode",
+                    tint =
+                        Color.White,
+                    modifier =
+                        Modifier.size(30.dp)
                 )
             }
 
             Column(
-                modifier = Modifier.weight(1f),
-                horizontalAlignment = Alignment.CenterHorizontally
+                modifier =
+                    Modifier.weight(1f),
+                horizontalAlignment =
+                    Alignment.CenterHorizontally
             ) {
+
                 Text(
                     text = "VISION",
                     color = Color.White,
                     fontSize = 15.sp,
-                    letterSpacing = 4.2.sp
+                    letterSpacing = 4.sp
                 )
 
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(
+                    modifier =
+                        Modifier.height(3.dp)
+                )
 
                 Text(
                     text = "BY ANSH YADAV",
-                    color = Color(0xFF6A6E86),
+                    color =
+                        Color(0xFF70758B),
                     fontSize = 8.sp,
-                    letterSpacing = 2.4.sp
+                    letterSpacing = 2.5.sp
                 )
             }
 
             Box(
-                modifier = Modifier
-                    .size(9.dp)
-                    .clip(CircleShape)
-                    .background(
-                        when (callState) {
-                            VoiceCallState.NO_PERMISSION -> Color(0xFFFF5B70)
-                            else -> Color(0xFF4FE39A)
-                        }
-                    )
+                modifier =
+                    Modifier
+                        .size(9.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (
+                                state ==
+                                    VoiceCallState.NO_PERMISSION
+                            ) {
+                                Color(0xFFFF5268)
+                            } else {
+                                Color(0xFF54E39B)
+                            }
+                        )
             )
         }
 
-        /* =====================================================
-         * STATE TITLE
-         * ===================================================== */
+        /* ----------------------------------------------------
+         * TITLE
+         * ---------------------------------------------------- */
+
         Column(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 105.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier =
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 98.dp),
+            horizontalAlignment =
+                Alignment.CenterHorizontally
         ) {
+
             Text(
-                text = stateTitle,
-                color = when (callState) {
-                    VoiceCallState.LISTENING -> Color(0xFF74AFFF)
-                    VoiceCallState.THINKING -> Color(0xFFAA7CFF)
-                    VoiceCallState.SPEAKING -> Color(0xFF6D8FFF)
-                    else -> Color(0xFF7B8097)
-                },
+                text = title,
+                color =
+                    when (state) {
+
+                        VoiceCallState.LISTENING ->
+                            Color(0xFF70A8FF)
+
+                        VoiceCallState.THINKING ->
+                            Color(0xFFB17BFF)
+
+                        VoiceCallState.SPEAKING ->
+                            Color(0xFF6B8EFF)
+
+                        else ->
+                            Color(0xFF7B8093)
+                    },
                 fontSize = 11.sp,
-                letterSpacing = 3.6.sp
+                letterSpacing = 3.5.sp
             )
 
-            Spacer(modifier = Modifier.height(9.dp))
+            Spacer(
+                modifier =
+                    Modifier.height(9.dp)
+            )
 
             Text(
-                text = stateSubtitle,
-                color = Color(0xFFF1F0F7),
+                text = subtitle,
+                color =
+                    Color(0xFFF2F1F7),
                 fontSize = 22.sp
             )
         }
 
-        /* =====================================================
-         * BRAIN VISUALIZER
-         * ===================================================== */
+        /* ----------------------------------------------------
+         * BRAIN
+         * ---------------------------------------------------- */
+
         Box(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 285.dp)
-                .size(318.dp),
-            contentAlignment = Alignment.Center
+            modifier =
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 280.dp)
+                    .size(320.dp)
         ) {
+
             Canvas(
-                modifier = Modifier.fillMaxSize()
+                modifier =
+                    Modifier.fillMaxSize()
             ) {
+
                 drawNeuralBrain(
-                    pulse = pulse,
                     flow = flow,
-                    active = callState != VoiceCallState.IDLE &&
-                        callState != VoiceCallState.NO_PERMISSION,
-                    thinking = callState == VoiceCallState.THINKING,
-                    speaking = callState == VoiceCallState.SPEAKING
+                    pulse = pulse,
+                    active = active,
+                    thinking =
+                        state ==
+                            VoiceCallState.THINKING,
+                    speaking =
+                        state ==
+                            VoiceCallState.SPEAKING
                 )
             }
         }
 
-        /* =====================================================
-         * PROCESS PIPELINE
-         * ===================================================== */
-        Row(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 600.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            val labels = listOf("UNDERSTAND", "ANALYZE", "RESPOND")
+        /* ----------------------------------------------------
+         * PIPELINE
+         * ---------------------------------------------------- */
 
-            labels.forEachIndexed { index, label ->
-                val passed = activeStage >= index
-                val current = activeStage == index
-
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(if (current) 9.dp else 7.dp)
-                            .clip(CircleShape)
-                            .background(
-                                when {
-                                    current -> Color(0xFF6EA2FF)
-                                    passed -> Color(0xFF52688F)
-                                    else -> Color(0xFF303241)
-                                }
-                            )
-                    )
-
-                    Spacer(modifier = Modifier.height(7.dp))
-
-                    Text(
-                        text = label,
-                        color = when {
-                            current -> Color(0xFFE9EAF5)
-                            passed -> Color(0xFF6D7187)
-                            else -> Color(0xFF464958)
-                        },
-                        fontSize = 8.sp,
-                        letterSpacing = 1.35.sp
-                    )
-                }
-
-                if (index < 2) {
-                    Box(
-                        modifier = Modifier
-                            .padding(horizontal = 10.dp, vertical = 0.dp)
-                            .width(37.dp)
-                            .height(1.dp)
-                            .background(
-                                if (activeStage > index)
-                                    Color(0xFF586D9A)
-                                else
-                                    Color(0xFF2A2C39)
-                            )
-                    )
-                }
-            }
-        }
-
-        /* =====================================================
-         * WAVEFORM
-         * ===================================================== */
-        NeuralWaveform(
-            active = callState == VoiceCallState.LISTENING ||
-                callState == VoiceCallState.THINKING ||
-                callState == VoiceCallState.SPEAKING,
-            thinking = callState == VoiceCallState.THINKING,
-            speaking = callState == VoiceCallState.SPEAKING,
-            flow = flow,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 648.dp)
+        ProcessingPipeline(
+            activeStage = activeStage,
+            modifier =
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 592.dp)
         )
 
-        /* =====================================================
-         * COMPACT VOICE CONTROL
-         * ===================================================== */
-        Surface(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .padding(
-                    start = 22.dp,
-                    end = 22.dp,
-                    bottom = 20.dp
-                ),
-            shape = RoundedCornerShape(26.dp),
-            color = Color(0xFF0A0A12).copy(alpha = 0.97f),
-            border = androidx.compose.foundation.BorderStroke(
-                width = 1.dp,
-                color = Color(0xFF2A2D42)
-            ),
-            shadowElevation = 14.dp
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
+        /* ----------------------------------------------------
+         * WAVEFORM
+         * ---------------------------------------------------- */
+
+        NeuralWaveform(
+            active =
+                state ==
+                    VoiceCallState.LISTENING ||
+                state ==
+                    VoiceCallState.THINKING ||
+                state ==
+                    VoiceCallState.SPEAKING,
+
+            thinking =
+                state ==
+                    VoiceCallState.THINKING,
+
+            speaking =
+                state ==
+                    VoiceCallState.SPEAKING,
+
+            flow = flow,
+
+            modifier =
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 642.dp)
+        )
+
+        /* ----------------------------------------------------
+         * BOTTOM CONTROL
+         * ---------------------------------------------------- */
+
+        VoiceBottomControl(
+            state = state,
+            onMicClick = onMicClick,
+            modifier =
+                Modifier
+                    .align(Alignment.BottomCenter)
                     .padding(
-                        start = 18.dp,
-                        end = 10.dp,
-                        top = 11.dp,
-                        bottom = 11.dp
-                    ),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(
-                        text = "VISION",
-                        color = Color.White,
-                        fontSize = 15.sp,
-                        letterSpacing = 1.8.sp
+                        start = 20.dp,
+                        end = 20.dp,
+                        bottom = 18.dp
                     )
-
-                    Spacer(modifier = Modifier.height(3.dp))
-
-                    Text(
-                        text = when (callState) {
-                            VoiceCallState.LISTENING -> "Listening in real-time"
-                            VoiceCallState.THINKING -> "Processing your voice"
-                            VoiceCallState.SPEAKING -> "Vision is speaking"
-                            VoiceCallState.IDLE -> "Ready to listen"
-                            VoiceCallState.NO_PERMISSION -> "Microphone permission required"
-                        },
-                        color = Color(0xFF7C8199),
-                        fontSize = 10.sp
-                    )
-                }
-
-                Box(
-                    modifier = Modifier
-                        .size(46.dp)
-                        .clip(CircleShape)
-                        .background(
-                            Brush.radialGradient(
-                                colors = listOf(
-                                    Color(0xFF5A7EFF),
-                                    Color(0xFF1A1A36)
-                                )
-                            )
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (callState == VoiceCallState.IDLE ||
-                        callState == VoiceCallState.NO_PERMISSION
-                    ) {
-                        IconButton(
-                            onClick = { requestListening() },
-                            modifier = Modifier.size(46.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Mic,
-                                contentDescription = "Start listening",
-                                tint = Color.White,
-                                modifier = Modifier.size(21.dp)
-                            )
-                        }
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .size(13.dp)
-                                .clip(RoundedCornerShape(3.dp))
-                                .background(Color.White)
-                        )
-                    }
-                }
-            }
-        }
+        )
     }
 }
+
+
+/* ============================================================
+ * PROCESSING PIPELINE
+ * ============================================================ */
+
+@Composable
+private fun ProcessingPipeline(
+    activeStage: Int,
+    modifier: Modifier
+) {
+
+    Row(
+        modifier = modifier,
+        verticalAlignment =
+            Alignment.CenterVertically,
+        horizontalArrangement =
+            Arrangement.Center
+    ) {
+
+        PipelineItem(
+            label = "UNDERSTAND",
+            active =
+                activeStage == 0,
+            passed =
+                activeStage > 0
+        )
+
+        PipelineLine(
+            active =
+                activeStage >= 1
+        )
+
+        PipelineItem(
+            label = "ANALYZE",
+            active =
+                activeStage == 1,
+            passed =
+                activeStage > 1
+        )
+
+        PipelineLine(
+            active =
+                activeStage >= 2
+        )
+
+        PipelineItem(
+            label = "RESPOND",
+            active =
+                activeStage == 2,
+            passed = false
+        )
+    }
+}
+
+@Composable
+private fun PipelineItem(
+    label: String,
+    active: Boolean,
+    passed: Boolean
+) {
+
+    Column(
+        horizontalAlignment =
+            Alignment.CenterHorizontally
+    ) {
+
+        Box(
+            modifier =
+                Modifier
+                    .size(
+                        if (active) {
+                            9.dp
+                        } else {
+                            7.dp
+                        }
+                    )
+                    .clip(CircleShape)
+                    .background(
+                        when {
+
+                            active ->
+                                Color(0xFF6D9FFF)
+
+                            passed ->
+                                Color(0xFF52668C)
+
+                            else ->
+                                Color(0xFF303340)
+                        }
+                    )
+        )
+
+        Spacer(
+            modifier =
+                Modifier.height(7.dp)
+        )
+
+        Text(
+            text = label,
+            color =
+                when {
+
+                    active ->
+                        Color(0xFFE7E8F1)
+
+                    passed ->
+                        Color(0xFF6C7084)
+
+                    else ->
+                        Color(0xFF444754)
+                },
+            fontSize = 8.sp,
+            letterSpacing = 1.35.sp
+        )
+    }
+}
+
+@Composable
+private fun PipelineLine(
+    active: Boolean
+) {
+
+    Box(
+        modifier =
+            Modifier
+                .padding(
+                    horizontal = 10.dp
+                )
+                .width(38.dp)
+                .height(1.dp)
+                .background(
+                    if (active) {
+                        Color(0xFF596E99)
+                    } else {
+                        Color(0xFF292B38)
+                    }
+                )
+    )
+}
+
+
+/* ============================================================
+ * WAVEFORM
+ * ============================================================ */
 
 @Composable
 private fun NeuralWaveform(
@@ -976,394 +1077,1164 @@ private fun NeuralWaveform(
     flow: Float,
     modifier: Modifier
 ) {
+
     Canvas(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(48.dp)
-            .padding(horizontal = 66.dp)
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .height(48.dp)
+                .padding(horizontal = 62.dp)
     ) {
+
         val bars = 41
         val slot = size.width / bars
         val centerY = size.height / 2f
 
         for (i in 0 until bars) {
-            val normalized = i.toFloat() / (bars - 1f)
-            val centerEnvelope = 1f - kotlin.math.abs(normalized - 0.5f) * 1.9f
-            val wave = kotlin.math.sin(flow * 6.283f + i * 0.72f)
-            val secondary = kotlin.math.sin(flow * 12.566f - i * 0.38f)
 
-            val barHeight = when {
-                !active -> 3.2f
-                speaking -> 5f + (centerEnvelope.coerceAtLeast(0f) * 21f) + kotlin.math.abs(wave) * 4f
-                thinking -> 4f + (centerEnvelope.coerceAtLeast(0f) * 14f) + kotlin.math.abs(secondary) * 3f
-                else -> 4f + (centerEnvelope.coerceAtLeast(0f) * 18f) + kotlin.math.abs(wave) * 5f
-            }
+            val normalized =
+                i.toFloat() /
+                    (bars - 1f)
 
-            val x = slot * i + slot / 2f
+            val envelope =
+                (
+                    1f -
+                        abs(
+                            normalized - 0.5f
+                        ) * 1.8f
+                    )
+                    .coerceAtLeast(0f)
+
+            val wave =
+                sin(
+                    flow * 6.283f +
+                        i * 0.72f
+                )
+
+            val wave2 =
+                sin(
+                    flow * 12.566f -
+                        i * 0.42f
+                )
+
+            val barHeight =
+                when {
+
+                    !active ->
+                        2.5f
+
+                    speaking ->
+                        5f +
+                            envelope * 20f +
+                            abs(wave) * 4f
+
+                    thinking ->
+                        4f +
+                            envelope * 14f +
+                            abs(wave2) * 3f
+
+                    else ->
+                        4f +
+                            envelope * 18f +
+                            abs(wave) * 5f
+                }
+
+            val x =
+                slot * i +
+                    slot / 2f
 
             drawLine(
-                color = when {
-                    speaking -> Color(0xFF668FFF).copy(alpha = 0.72f)
-                    thinking -> Color(0xFFA275FF).copy(alpha = 0.68f)
-                    active -> Color(0xFF568CFF).copy(alpha = 0.70f)
-                    else -> Color(0xFF3A4053).copy(alpha = 0.48f)
-                },
-                start = Offset(x, centerY - barHeight),
-                end = Offset(x, centerY + barHeight),
+                color =
+                    when {
+
+                        speaking ->
+                            Color(0xFF648EFF)
+                                .copy(alpha = 0.75f)
+
+                        thinking ->
+                            Color(0xFFA475FF)
+                                .copy(alpha = 0.72f)
+
+                        active ->
+                            Color(0xFF568FFF)
+                                .copy(alpha = 0.72f)
+
+                        else ->
+                            Color(0xFF3D4356)
+                                .copy(alpha = 0.42f)
+                    },
+
+                start =
+                    Offset(
+                        x,
+                        centerY - barHeight
+                    ),
+
+                end =
+                    Offset(
+                        x,
+                        centerY + barHeight
+                    ),
+
                 strokeWidth = 2f,
-                cap = StrokeCap.Round
+
+                cap =
+                    StrokeCap.Round
             )
         }
     }
 }
 
+
+/* ============================================================
+ * NEURAL BRAIN
+ * ============================================================ */
+
 private fun DrawScope.drawNeuralBrain(
-    pulse: Float,
     flow: Float,
+    pulse: Float,
     active: Boolean,
     thinking: Boolean,
     speaking: Boolean
 ) {
-    val cx = size.width / 2f
-    val cy = size.height / 2f
 
-    val brainW = size.width * 0.82f
-    val brainH = size.height * 0.70f
-    val halfW = brainW / 2f
-    val halfH = brainH / 2f
+    val cx =
+        size.width / 2f
 
-    val accent = when {
-        thinking -> Color(0xFFAF7BFF)
-        speaking -> Color(0xFF648FFF)
-        active -> Color(0xFF56A6FF)
-        else -> Color(0xFF46516D)
-    }
+    val cy =
+        size.height / 2f
 
-    /* ---------------------------------------------------------
-     * Outer orbital rings: subtle, not the main object.
-     * --------------------------------------------------------- */
+    val brainWidth =
+        size.width * 0.78f
+
+    val brainHeight =
+        size.height * 0.66f
+
+    val halfW =
+        brainWidth / 2f
+
+    val halfH =
+        brainHeight / 2f
+
+    val accent =
+        when {
+
+            thinking ->
+                Color(0xFFAF7BFF)
+
+            speaking ->
+                Color(0xFF6490FF)
+
+            active ->
+                Color(0xFF56A6FF)
+
+            else ->
+                Color(0xFF45516D)
+        }
+
+    /* --------------------------------------------------------
+     * Outer neural field
+     * -------------------------------------------------------- */
+
     for (i in 1..6) {
-        val radius = halfW * (0.72f + i * 0.09f)
+
+        val radius =
+            halfW *
+                (0.78f + i * 0.085f)
+
         drawCircle(
-            color = Color(0xFF6570A1).copy(
-                alpha = if (active) 0.09f else 0.035f
-            ),
+            color =
+                Color(0xFF6874A8).copy(
+                    alpha =
+                        if (active) {
+                            0.085f
+                        } else {
+                            0.025f
+                        }
+                ),
+
             radius = radius,
-            center = Offset(cx, cy),
-            style = androidx.compose.ui.graphics.drawscope.Stroke(
-                width = 1.dp.toPx()
+
+            center =
+                Offset(
+                    cx,
+                    cy
+                ),
+
+            style =
+                Stroke(
+                    width = 1.dp.toPx()
+                )
+        )
+    }
+
+    /* --------------------------------------------------------
+     * Left hemisphere
+     * -------------------------------------------------------- */
+
+    val leftBrain =
+        Path().apply {
+
+            moveTo(
+                cx,
+                cy - halfH
             )
-        )
-    }
 
-    /* ---------------------------------------------------------
-     * Brain silhouette — two actual hemispheres.
-     * --------------------------------------------------------- */
-    val left = Path().apply {
-        moveTo(cx, cy - halfH)
-        cubicTo(
-            cx - halfW * 0.20f, cy - halfH * 1.05f,
-            cx - halfW * 0.48f, cy - halfH * 0.98f,
-            cx - halfW * 0.58f, cy - halfH * 0.77f
-        )
-        cubicTo(
-            cx - halfW * 0.88f, cy - halfH * 0.78f,
-            cx - halfW * 0.99f, cy - halfH * 0.48f,
-            cx - halfW * 0.82f, cy - halfH * 0.29f
-        )
-        cubicTo(
-            cx - halfW * 1.00f, cy - halfH * 0.08f,
-            cx - halfW * 0.99f, cy + halfH * 0.20f,
-            cx - halfW * 0.79f, cy + halfH * 0.30f
-        )
-        cubicTo(
-            cx - halfW * 0.88f, cy + halfH * 0.57f,
-            cx - halfW * 0.65f, cy + halfH * 0.83f,
-            cx - halfW * 0.38f, cy + halfH * 0.78f
-        )
-        cubicTo(
-            cx - halfW * 0.20f, cy + halfH * 0.98f,
-            cx - halfW * 0.08f, cy + halfH * 0.95f,
-            cx, cy + halfH
-        )
-        lineTo(cx, cy - halfH)
-        close()
-    }
+            cubicTo(
+                cx - halfW * 0.18f,
+                cy - halfH * 1.04f,
 
-    val right = Path().apply {
-        moveTo(cx, cy - halfH)
-        cubicTo(
-            cx + halfW * 0.20f, cy - halfH * 1.05f,
-            cx + halfW * 0.48f, cy - halfH * 0.98f,
-            cx + halfW * 0.58f, cy - halfH * 0.77f
-        )
-        cubicTo(
-            cx + halfW * 0.88f, cy - halfH * 0.78f,
-            cx + halfW * 0.99f, cy - halfH * 0.48f,
-            cx + halfW * 0.82f, cy - halfH * 0.29f
-        )
-        cubicTo(
-            cx + halfW * 1.00f, cy - halfH * 0.08f,
-            cx + halfW * 0.99f, cy + halfH * 0.20f,
-            cx + halfW * 0.79f, cy + halfH * 0.30f
-        )
-        cubicTo(
-            cx + halfW * 0.88f, cy + halfH * 0.57f,
-            cx + halfW * 0.65f, cy + halfH * 0.83f,
-            cx + halfW * 0.38f, cy + halfH * 0.78f
-        )
-        cubicTo(
-            cx + halfW * 0.20f, cy + halfH * 0.98f,
-            cx + halfW * 0.08f, cy + halfH * 0.95f,
-            cx, cy + halfH
-        )
-        lineTo(cx, cy - halfH)
-        close()
-    }
+                cx - halfW * 0.52f,
+                cy - halfH * 0.98f,
 
-    val fillBrush = Brush.radialGradient(
-        colors = listOf(
-            accent.copy(alpha = if (active) 0.52f else 0.16f),
-            Color(0xFF17366D).copy(alpha = if (active) 0.30f else 0.08f),
-            Color(0xFF080A17).copy(alpha = 0.05f)
-        ),
-        center = Offset(cx, cy),
-        radius = halfW * 1.12f
+                cx - halfW * 0.61f,
+                cy - halfH * 0.72f
+            )
+
+            cubicTo(
+                cx - halfW * 0.88f,
+                cy - halfH * 0.78f,
+
+                cx - halfW * 1.00f,
+                cy - halfH * 0.50f,
+
+                cx - halfW * 0.82f,
+                cy - halfH * 0.27f
+            )
+
+            cubicTo(
+                cx - halfW * 1.00f,
+                cy - halfH * 0.05f,
+
+                cx - halfW * 0.98f,
+                cy + halfH * 0.21f,
+
+                cx - halfW * 0.78f,
+                cy + halfH * 0.31f
+            )
+
+            cubicTo(
+                cx - halfW * 0.88f,
+                cy + halfH * 0.58f,
+
+                cx - halfW * 0.61f,
+                cy + halfH * 0.85f,
+
+                cx - halfW * 0.36f,
+                cy + halfH * 0.77f
+            )
+
+            cubicTo(
+                cx - halfW * 0.19f,
+                cy + halfH * 0.97f,
+
+                cx - halfW * 0.08f,
+                cy + halfH * 0.98f,
+
+                cx,
+                cy + halfH
+            )
+
+            lineTo(
+                cx,
+                cy - halfH
+            )
+
+            close()
+        }
+
+    /* --------------------------------------------------------
+     * Right hemisphere
+     * -------------------------------------------------------- */
+
+    val rightBrain =
+        Path().apply {
+
+            moveTo(
+                cx,
+                cy - halfH
+            )
+
+            cubicTo(
+                cx + halfW * 0.18f,
+                cy - halfH * 1.04f,
+
+                cx + halfW * 0.52f,
+                cy - halfH * 0.98f,
+
+                cx + halfW * 0.61f,
+                cy - halfH * 0.72f
+            )
+
+            cubicTo(
+                cx + halfW * 0.88f,
+                cy - halfH * 0.78f,
+
+                cx + halfW * 1.00f,
+                cy - halfH * 0.50f,
+
+                cx + halfW * 0.82f,
+                cy - halfH * 0.27f
+            )
+
+            cubicTo(
+                cx + halfW * 1.00f,
+                cy - halfH * 0.05f,
+
+                cx + halfW * 0.98f,
+                cy + halfH * 0.21f,
+
+                cx + halfW * 0.78f,
+                cy + halfH * 0.31f
+            )
+
+            cubicTo(
+                cx + halfW * 0.88f,
+                cy + halfH * 0.58f,
+
+                cx + halfW * 0.61f,
+                cy + halfH * 0.85f,
+
+                cx + halfW * 0.36f,
+                cy + halfH * 0.77f
+            )
+
+            cubicTo(
+                cx + halfW * 0.19f,
+                cy + halfH * 0.97f,
+
+                cx + halfW * 0.08f,
+                cy + halfH * 0.98f,
+
+                cx,
+                cy + halfH
+            )
+
+            lineTo(
+                cx,
+                cy - halfH
+            )
+
+            close()
+        }
+
+    val brainBrush =
+        Brush.radialGradient(
+            colors =
+                listOf(
+                    accent.copy(
+                        alpha =
+                            if (active) {
+                                0.46f
+                            } else {
+                                0.12f
+                            }
+                    ),
+
+                    Color(0xFF173A78).copy(
+                        alpha =
+                            if (active) {
+                                0.27f
+                            } else {
+                                0.06f
+                            }
+                    ),
+
+                    Color.Transparent
+                ),
+
+            center =
+                Offset(
+                    cx,
+                    cy
+                ),
+
+            radius =
+                halfW * 1.15f
+        )
+
+    drawPath(
+        path = leftBrain,
+        brush = brainBrush
     )
 
     drawPath(
-        path = left,
-        brush = fillBrush
-    )
-    drawPath(
-        path = right,
-        brush = fillBrush
+        path = rightBrain,
+        brush = brainBrush
     )
 
     drawPath(
-        path = left,
-        color = accent.copy(alpha = if (active) 0.52f else 0.20f),
-        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.4.dp.toPx())
+        path = leftBrain,
+        color =
+            accent.copy(
+                alpha =
+                    if (active) {
+                        0.56f
+                    } else {
+                        0.17f
+                    }
+            ),
+        style =
+            Stroke(
+                width = 1.5.dp.toPx()
+            )
     )
+
     drawPath(
-        path = right,
-        color = accent.copy(alpha = if (active) 0.52f else 0.20f),
-        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.4.dp.toPx())
+        path = rightBrain,
+        color =
+            accent.copy(
+                alpha =
+                    if (active) {
+                        0.56f
+                    } else {
+                        0.17f
+                    }
+            ),
+        style =
+            Stroke(
+                width = 1.5.dp.toPx()
+            )
     )
 
-    /* ---------------------------------------------------------
-     * Cortical folds. These make it read as a brain, not a globe.
-     * --------------------------------------------------------- */
-    val foldColor = accent.copy(alpha = if (active) 0.48f else 0.16f)
+    /* --------------------------------------------------------
+     * Cortical folds
+     * -------------------------------------------------------- */
 
-    fun fold(
+    val foldColor =
+        accent.copy(
+            alpha =
+                if (active) {
+                    0.44f
+                } else {
+                    0.12f
+                }
+        )
+
+    fun corticalFold(
         side: Float,
         yFactor: Float,
         bend: Float,
         length: Float
     ) {
-        val path = Path()
-        val y = cy + yFactor * halfH
-        val startX = cx + side * halfW * 0.15f
-        val endX = cx + side * halfW * length
 
-        path.moveTo(startX, y)
+        val path =
+            Path()
+
+        val y =
+            cy +
+                yFactor *
+                    halfH
+
+        val startX =
+            cx +
+                side *
+                halfW *
+                0.13f
+
+        val endX =
+            cx +
+                side *
+                halfW *
+                length
+
+        path.moveTo(
+            startX,
+            y
+        )
+
         path.cubicTo(
-            cx + side * halfW * 0.34f,
-            y - halfH * 0.11f * bend,
-            cx + side * halfW * 0.48f,
-            y + halfH * 0.12f * bend,
+            cx +
+                side *
+                halfW *
+                0.34f,
+
+            y -
+                halfH *
+                0.11f *
+                bend,
+
+            cx +
+                side *
+                halfW *
+                0.51f,
+
+            y +
+                halfH *
+                0.12f *
+                bend,
+
             endX,
-            y + halfH * 0.02f
+
+            y +
+                halfH *
+                0.02f
         )
 
         drawPath(
             path = path,
             color = foldColor,
-            style = androidx.compose.ui.graphics.drawscope.Stroke(
-                width = 1.15.dp.toPx(),
-                cap = StrokeCap.Round
-            )
+            style =
+                Stroke(
+                    width = 1.1.dp.toPx(),
+                    cap =
+                        StrokeCap.Round
+                )
         )
     }
 
-    for (index in 0 until 7) {
-        val yFactor = -0.75f + index * 0.24f
-        fold(-1f, yFactor, 1f + index * 0.05f, 0.78f)
-        fold(1f, yFactor + 0.01f, 1.1f + index * 0.04f, 0.78f)
-    }
+    for (i in 0 until 7) {
 
-    // Short secondary folds.
-    for (index in 0 until 10) {
-        val yFactor = -0.86f + index * 0.18f
-        fold(
-            if (index % 2 == 0) -1f else 1f,
-            yFactor,
-            0.7f,
-            0.59f
+        val y =
+            -0.75f +
+                i * 0.24f
+
+        corticalFold(
+            side = -1f,
+            yFactor = y,
+            bend = 1f + i * 0.05f,
+            length = 0.78f
+        )
+
+        corticalFold(
+            side = 1f,
+            yFactor = y + 0.01f,
+            bend = 1.05f + i * 0.05f,
+            length = 0.78f
         )
     }
 
-    /* ---------------------------------------------------------
-     * Neural network nodes distributed through both hemispheres.
-     * --------------------------------------------------------- */
-    val nodes = mutableListOf<Offset>()
+    for (i in 0 until 8) {
+
+        corticalFold(
+            side =
+                if (i % 2 == 0) {
+                    -1f
+                } else {
+                    1f
+                },
+
+            yFactor =
+                -0.83f +
+                    i * 0.21f,
+
+            bend = 0.75f,
+
+            length = 0.58f
+        )
+    }
+
+    /* --------------------------------------------------------
+     * Neural nodes
+     * -------------------------------------------------------- */
+
+    val nodes =
+        mutableListOf<Offset>()
+
     val rows = 7
-    val cols = 7
+    val columns = 7
 
     for (side in listOf(-1f, 1f)) {
-        for (row in 0 until rows) {
-            val ny = -0.82f + row * 0.27f
-            val rowNorm = kotlin.math.abs(ny)
-            val widthAtRow =
-                (1f - rowNorm * 0.42f) * halfW * 0.84f
 
-            for (col in 0 until cols) {
-                val xNorm = -1f + col * (2f / (cols - 1f))
-                val x = cx + side * (0.13f * halfW + xNorm * widthAtRow)
-                val y = cy + ny * halfH * 0.90f
-                val jitterX = kotlin.math.sin(row * 1.7f + col * 0.95f) * 4.5f
-                val jitterY = kotlin.math.cos(row * 1.2f + col * 0.68f) * 3.5f
-                nodes += Offset(x + jitterX, y + jitterY)
+        for (row in 0 until rows) {
+
+            val yNorm =
+                -0.80f +
+                    row * 0.265f
+
+            val availableWidth =
+                (
+                    1f -
+                        abs(yNorm) *
+                        0.40f
+                    ) *
+                    halfW *
+                    0.83f
+
+            for (column in 0 until columns) {
+
+                val xNorm =
+                    -1f +
+                        column *
+                        (
+                            2f /
+                                (columns - 1f)
+                        )
+
+                val baseX =
+                    cx +
+                        side *
+                        (
+                            halfW * 0.13f +
+                                xNorm *
+                                availableWidth
+                        )
+
+                val baseY =
+                    cy +
+                        yNorm *
+                        halfH *
+                        0.91f
+
+                val jitterX =
+                    sin(
+                        row * 1.65f +
+                            column * 0.91f
+                    ) *
+                        3.8f
+
+                val jitterY =
+                    cos(
+                        row * 1.15f +
+                            column * 0.67f
+                    ) *
+                        3.0f
+
+                nodes +=
+                    Offset(
+                        baseX + jitterX,
+                        baseY + jitterY
+                    )
             }
         }
     }
 
-    // Network connections.
+    /* --------------------------------------------------------
+     * Connections
+     * -------------------------------------------------------- */
+
     for (i in nodes.indices) {
-        val a = nodes[i]
+
+        val first =
+            nodes[i]
+
         for (j in i + 1 until nodes.size) {
-            val b = nodes[j]
-            val dx = a.x - b.x
-            val dy = a.y - b.y
-            val distance = kotlin.math.sqrt(dx * dx + dy * dy)
+
+            val second =
+                nodes[j]
+
+            val dx =
+                first.x -
+                    second.x
+
+            val dy =
+                first.y -
+                    second.y
+
+            val distance =
+                sqrt(
+                    dx * dx +
+                        dy * dy
+                )
 
             if (distance < 39f) {
+
+                val alpha =
+                    if (active) {
+
+                        (
+                            0.31f -
+                                distance / 180f
+                            )
+                            .coerceAtLeast(
+                                0.035f
+                            )
+
+                    } else {
+                        0.045f
+                    }
+
                 drawLine(
-                    color = accent.copy(
-                        alpha = if (active) {
-                            (0.32f - distance / 170f).coerceAtLeast(0.035f)
-                        } else {
-                            0.055f
-                        }
-                    ),
-                    start = a,
-                    end = b,
-                    strokeWidth = 0.75.dp.toPx()
+                    color =
+                        accent.copy(
+                            alpha = alpha
+                        ),
+
+                    start = first,
+
+                    end = second,
+
+                    strokeWidth =
+                        0.75.dp.toPx()
                 )
             }
         }
     }
 
-    // Central inter-hemisphere links.
-    for (row in 1..5) {
-        val y = cy - halfH * 0.74f + row * halfH * 0.30f
+    /* --------------------------------------------------------
+     * Cross hemisphere connections
+     * -------------------------------------------------------- */
+
+    for (i in 1..5) {
+
+        val y =
+            cy -
+                halfH * 0.72f +
+                i *
+                halfH *
+                0.30f
+
         drawLine(
-            color = accent.copy(alpha = if (active) 0.35f else 0.08f),
-            start = Offset(cx - halfW * 0.11f, y),
-            end = Offset(cx + halfW * 0.11f, y),
-            strokeWidth = 0.8.dp.toPx()
+            color =
+                accent.copy(
+                    alpha =
+                        if (active) {
+                            0.30f
+                        } else {
+                            0.07f
+                        }
+                ),
+
+            start =
+                Offset(
+                    cx -
+                        halfW *
+                        0.10f,
+
+                    y
+                ),
+
+            end =
+                Offset(
+                    cx +
+                        halfW *
+                        0.10f,
+
+                    y
+                ),
+
+            strokeWidth =
+                0.8.dp.toPx()
         )
     }
 
-    // Animated signal line through the brain.
-    if (active) {
-        val signal = (flow * nodes.size).toInt() % nodes.size
-        val p = nodes[signal]
-        drawCircle(
-            color = accent.copy(alpha = 0.95f),
-            radius = 2.7.dp.toPx(),
-            center = p
-        )
+    /* --------------------------------------------------------
+     * Animated signal
+     * -------------------------------------------------------- */
 
-        val next = nodes[(signal + 8) % nodes.size]
+    if (active && nodes.isNotEmpty()) {
+
+        val signalIndex =
+            (
+                flow *
+                    nodes.size
+                )
+                .toInt() %
+                nodes.size
+
+        val signal =
+            nodes[signalIndex]
+
+        val next =
+            nodes[
+                (signalIndex + 8) %
+                    nodes.size
+            ]
+
         drawLine(
-            color = accent.copy(alpha = 0.48f),
-            start = p,
+            color =
+                accent.copy(
+                    alpha = 0.50f
+                ),
+
+            start = signal,
+
             end = next,
-            strokeWidth = 1.1.dp.toPx(),
-            cap = StrokeCap.Round
+
+            strokeWidth =
+                1.2.dp.toPx(),
+
+            cap =
+                StrokeCap.Round
+        )
+
+        drawCircle(
+            color =
+                accent.copy(
+                    alpha = 0.95f
+                ),
+
+            radius =
+                2.8.dp.toPx(),
+
+            center = signal
         )
     }
 
-    // Center fissure.
-    val fissure = Path()
-    fissure.moveTo(cx, cy - halfH * 0.96f)
-    fissure.cubicTo(
-        cx - halfW * 0.035f,
-        cy - halfH * 0.53f,
-        cx + halfW * 0.026f,
-        cy - halfH * 0.08f,
-        cx,
-        cy + halfH * 0.15f
-    )
-    fissure.cubicTo(
-        cx - halfW * 0.028f,
-        cy + halfH * 0.52f,
-        cx + halfW * 0.032f,
-        cy + halfH * 0.78f,
-        cx,
-        cy + halfH * 0.98f
-    )
+    /* --------------------------------------------------------
+     * Central brain fissure
+     * -------------------------------------------------------- */
+
+    val fissure =
+        Path().apply {
+
+            moveTo(
+                cx,
+                cy - halfH * 0.96f
+            )
+
+            cubicTo(
+                cx - halfW * 0.035f,
+                cy - halfH * 0.54f,
+
+                cx + halfW * 0.025f,
+                cy - halfH * 0.08f,
+
+                cx,
+                cy + halfH * 0.16f
+            )
+
+            cubicTo(
+                cx - halfW * 0.025f,
+                cy + halfH * 0.50f,
+
+                cx + halfW * 0.03f,
+                cy + halfH * 0.78f,
+
+                cx,
+                cy + halfH * 0.97f
+            )
+        }
 
     drawPath(
         path = fissure,
-        color = Color.White.copy(alpha = if (active) 0.35f else 0.12f),
-        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.2.dp.toPx())
+        color =
+            Color.White.copy(
+                alpha =
+                    if (active) {
+                        0.34f
+                    } else {
+                        0.10f
+                    }
+            ),
+        style =
+            Stroke(
+                width = 1.2.dp.toPx()
+            )
     )
 
-    // Nodes.
+    /* --------------------------------------------------------
+     * Nodes
+     * -------------------------------------------------------- */
+
     nodes.forEachIndexed { index, node ->
+
         val nodePulse =
             if (active) {
-                1f + kotlin.math.sin(flow * 6.283f + index * 0.37f) * 0.25f
+
+                1f +
+                    sin(
+                        flow * 6.283f +
+                            index * 0.37f
+                    ) *
+                    0.25f
+
             } else {
-                0.72f
+                0.70f
             }
 
         drawCircle(
-            color = accent.copy(alpha = if (active) 0.88f else 0.23f),
-            radius = 1.7.dp.toPx() * nodePulse,
+            color =
+                accent.copy(
+                    alpha =
+                        if (active) {
+                            0.88f
+                        } else {
+                            0.22f
+                        }
+                ),
+
+            radius =
+                1.7.dp.toPx() *
+                    nodePulse,
+
             center = node
         )
     }
 
-    /* ---------------------------------------------------------
-     * Center V core — deliberately small, not another giant orb.
-     * --------------------------------------------------------- */
+    /* --------------------------------------------------------
+     * Small central AI core
+     * -------------------------------------------------------- */
+
     drawCircle(
-        color = accent.copy(alpha = if (active) 0.16f * pulse else 0.05f),
-        radius = 27.dp.toPx() * pulse,
-        center = Offset(cx, cy)
+        color =
+            accent.copy(
+                alpha =
+                    if (active) {
+                        0.16f *
+                            pulse
+                    } else {
+                        0.045f
+                    }
+            ),
+
+        radius =
+            27.dp.toPx() *
+                pulse,
+
+        center =
+            Offset(
+                cx,
+                cy
+            )
     )
 
-    val v = Path().apply {
-        moveTo(cx - 11.dp.toPx(), cy - 7.dp.toPx())
-        lineTo(cx, cy + 8.dp.toPx())
-        lineTo(cx + 11.dp.toPx(), cy - 7.dp.toPx())
-    }
+    /* --------------------------------------------------------
+     * Small VISION mark
+     * -------------------------------------------------------- */
+
+    val v =
+        Path().apply {
+
+            moveTo(
+                cx - 11.dp.toPx(),
+                cy - 7.dp.toPx()
+            )
+
+            lineTo(
+                cx,
+                cy + 8.dp.toPx()
+            )
+
+            lineTo(
+                cx + 11.dp.toPx(),
+                cy - 7.dp.toPx()
+            )
+        }
 
     drawPath(
         path = v,
-        color = Color.White.copy(alpha = if (active) 0.86f else 0.30f),
-        style = androidx.compose.ui.graphics.drawscope.Stroke(
-            width = 1.8.dp.toPx(),
-            cap = StrokeCap.Round,
-            join = androidx.compose.ui.graphics.StrokeJoin.Round
-        )
+        color =
+            Color.White.copy(
+                alpha =
+                    if (active) {
+                        0.88f
+                    } else {
+                        0.28f
+                    }
+            ),
+        style =
+            Stroke(
+                width = 1.8.dp.toPx(),
+                cap =
+                    StrokeCap.Round,
+                join =
+                    StrokeJoin.Round
+            )
     )
 
-    // A few orbiting particles outside the brain, very subtle.
+    /* --------------------------------------------------------
+     * Very subtle orbiting particles
+     * -------------------------------------------------------- */
+
     if (active) {
+
         for (i in 0 until 8) {
-            val angle = flow * 6.283f + i * 0.785f
-            val x = cx + kotlin.math.cos(angle) * halfW * 1.08f
-            val y = cy + kotlin.math.sin(angle) * halfH * 0.72f
+
+            val angle =
+                flow * 6.283f +
+                    i * 0.785f
+
+            val x =
+                cx +
+                    cos(angle) *
+                    halfW *
+                    1.07f
+
+            val y =
+                cy +
+                    sin(angle) *
+                    halfH *
+                    0.72f
+
             drawCircle(
-                color = accent.copy(alpha = 0.55f),
-                radius = 1.5.dp.toPx(),
-                center = Offset(x, y)
+                color =
+                    accent.copy(
+                        alpha = 0.52f
+                    ),
+
+                radius =
+                    1.4.dp.toPx(),
+
+                center =
+                    Offset(
+                        x,
+                        y
+                    )
             )
+        }
+    }
+}
+
+
+/* ============================================================
+ * BOTTOM VOICE CONTROL
+ * ============================================================ */
+
+@Composable
+private fun VoiceBottomControl(
+    state: VoiceCallState,
+    onMicClick: () -> Unit,
+    modifier: Modifier
+) {
+
+    Surface(
+        modifier =
+            modifier.fillMaxWidth(),
+
+        shape =
+            RoundedCornerShape(
+                24.dp
+            ),
+
+        color =
+            Color(0xFF090A11)
+                .copy(alpha = 0.97f),
+
+        border =
+            BorderStroke(
+                width = 1.dp,
+                color =
+                    Color(0xFF292C40)
+            ),
+
+        shadowElevation =
+            12.dp
+    ) {
+
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        start = 17.dp,
+                        end = 10.dp,
+                        top = 10.dp,
+                        bottom = 10.dp
+                    ),
+
+            verticalAlignment =
+                Alignment.CenterVertically
+        ) {
+
+            Column(
+                modifier =
+                    Modifier.weight(1f)
+            ) {
+
+                Text(
+                    text = "VISION",
+                    color =
+                        Color.White,
+                    fontSize = 15.sp,
+                    letterSpacing = 1.8.sp
+                )
+
+                Spacer(
+                    modifier =
+                        Modifier.height(3.dp)
+                )
+
+                Text(
+                    text =
+                        when (state) {
+
+                            VoiceCallState.LISTENING ->
+                                "Listening in real-time"
+
+                            VoiceCallState.THINKING ->
+                                "Processing your voice"
+
+                            VoiceCallState.SPEAKING ->
+                                "Vision is speaking"
+
+                            VoiceCallState.IDLE ->
+                                "Ready to listen"
+
+                            VoiceCallState.NO_PERMISSION ->
+                                "Microphone permission required"
+                        },
+
+                    color =
+                        Color(0xFF7D8298),
+
+                    fontSize = 10.sp
+                )
+            }
+
+            /* ------------------------------------------------
+             * Mic control stays on RIGHT.
+             * ------------------------------------------------ */
+
+            Box(
+                modifier =
+                    Modifier
+                        .size(46.dp)
+                        .clip(CircleShape)
+                        .background(
+                            Brush.radialGradient(
+                                colors =
+                                    listOf(
+                                        Color(0xFF5C7FFF),
+                                        Color(0xFF1B1C36)
+                                    )
+                            )
+                        ),
+
+                contentAlignment =
+                    Alignment.Center
+            ) {
+
+                if (
+                    state ==
+                        VoiceCallState.IDLE ||
+                    state ==
+                        VoiceCallState.NO_PERMISSION
+                ) {
+
+                    IconButton(
+                        onClick = onMicClick,
+                        modifier =
+                            Modifier.size(46.dp)
+                    ) {
+
+                        Icon(
+                            imageVector =
+                                Icons.Default.Mic,
+
+                            contentDescription =
+                                "Start listening",
+
+                            tint =
+                                Color.White,
+
+                            modifier =
+                                Modifier.size(21.dp)
+                        )
+                    }
+
+                } else {
+
+                    /*
+                     * Speaking/listening/processing:
+                     * compact square stop indicator.
+                     * No extra floating black button.
+                     */
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(13.dp)
+                                .clip(
+                                    RoundedCornerShape(
+                                        3.dp
+                                    )
+                                )
+                                .background(
+                                    Color.White
+                                )
+                    )
+                }
+            }
         }
     }
 }
