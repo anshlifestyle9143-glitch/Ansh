@@ -52,6 +52,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -1329,6 +1330,32 @@ private fun DrawScope.drawNeuralBrain(
         }
 
     /* --------------------------------------------------------
+     * Ambient volumetric bloom (fakes a soft blur / glow)
+     * -------------------------------------------------------- */
+
+    drawCircle(
+        brush =
+            Brush.radialGradient(
+                colors =
+                    listOf(
+                        accent.copy(
+                            alpha =
+                                if (active) {
+                                    0.30f
+                                } else {
+                                    0.05f
+                                }
+                        ),
+                        accent.copy(alpha = 0f)
+                    ),
+                center = Offset(cx, cy),
+                radius = halfW * 1.35f
+            ),
+        radius = halfW * 1.35f,
+        center = Offset(cx, cy)
+    )
+
+    /* --------------------------------------------------------
      * Outer neural field
      * -------------------------------------------------------- */
 
@@ -1514,6 +1541,45 @@ private fun DrawScope.drawNeuralBrain(
             close()
         }
 
+    val glowStrokeLayers =
+        listOf(
+            11.dp.toPx() to 0.05f,
+            7.5.dp.toPx() to 0.09f,
+            4.5.dp.toPx() to 0.15f
+        )
+
+    for ((glowWidth, glowAlpha) in glowStrokeLayers) {
+
+        val layerAlpha =
+            if (active) {
+                glowAlpha
+            } else {
+                glowAlpha * 0.25f
+            }
+
+        drawPath(
+            path = leftBrain,
+            color = accent.copy(alpha = layerAlpha),
+            style =
+                Stroke(
+                    width = glowWidth,
+                    cap = StrokeCap.Round,
+                    join = StrokeJoin.Round
+                )
+        )
+
+        drawPath(
+            path = rightBrain,
+            color = accent.copy(alpha = layerAlpha),
+            style =
+                Stroke(
+                    width = glowWidth,
+                    cap = StrokeCap.Round,
+                    join = StrokeJoin.Round
+                )
+        )
+    }
+
     val brainBrush =
         Brush.radialGradient(
             colors =
@@ -1592,6 +1658,60 @@ private fun DrawScope.drawNeuralBrain(
                 width = 1.5.dp.toPx()
             )
     )
+
+    /* --------------------------------------------------------
+     * Volumetric shading (adds a 3D, lit-sphere feel)
+     * -------------------------------------------------------- */
+
+    val lightAlpha =
+        if (active) {
+            0.16f
+        } else {
+            0.04f
+        }
+
+    val shadowAlpha =
+        if (active) {
+            0.22f
+        } else {
+            0.06f
+        }
+
+    for (hemisphere in listOf(leftBrain, rightBrain)) {
+
+        clipPath(hemisphere) {
+
+            drawCircle(
+                brush =
+                    Brush.radialGradient(
+                        colors =
+                            listOf(
+                                Color.White.copy(alpha = lightAlpha),
+                                Color.White.copy(alpha = 0f)
+                            ),
+                        center = Offset(cx - halfW * 0.30f, cy - halfH * 0.62f),
+                        radius = halfW * 0.85f
+                    ),
+                radius = halfW * 0.85f,
+                center = Offset(cx - halfW * 0.30f, cy - halfH * 0.62f)
+            )
+
+            drawCircle(
+                brush =
+                    Brush.radialGradient(
+                        colors =
+                            listOf(
+                                Color.Black.copy(alpha = shadowAlpha),
+                                Color.Black.copy(alpha = 0f)
+                            ),
+                        center = Offset(cx + halfW * 0.35f, cy + halfH * 0.55f),
+                        radius = halfW * 0.95f
+                    ),
+                radius = halfW * 0.95f,
+                center = Offset(cx + halfW * 0.35f, cy + halfH * 0.55f)
+            )
+        }
+    }
 
     /* --------------------------------------------------------
      * Cortical folds
@@ -2057,10 +2177,33 @@ private fun DrawScope.drawNeuralBrain(
             accent.copy(
                 alpha =
                     if (active) {
-                        0.16f *
+                        0.10f *
                             pulse
                     } else {
-                        0.045f
+                        0.02f
+                    }
+            ),
+
+        radius =
+            48.dp.toPx() *
+                pulse,
+
+        center =
+            Offset(
+                cx,
+                cy
+            )
+    )
+
+    drawCircle(
+        color =
+            accent.copy(
+                alpha =
+                    if (active) {
+                        0.26f *
+                            pulse
+                    } else {
+                        0.06f
                     }
             ),
 
