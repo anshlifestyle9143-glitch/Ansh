@@ -118,6 +118,8 @@ class VisionVoiceController(
                     return@launch
                 }
 
+                startIdleTimeout()
+
                 listenForInput()
             }
     }
@@ -238,17 +240,6 @@ class VisionVoiceController(
                     )
 
                     onListeningCallback()
-
-                    /*
-                     * Start the 6-second countdown whenever
-                     * the microphone becomes ready.
-                     *
-                     * This covers:
-                     * 1. Initial listening after "Yes Boss"
-                     * 2. Listening after an AI response
-                     * 3. Listening after a command
-                     */
-                    startIdleTimeout()
 
                 } else {
 
@@ -609,6 +600,7 @@ class VisionVoiceController(
             delay(delayMs)
 
             if (active) {
+                startIdleTimeout()
                 listenForInput()
             }
         }
