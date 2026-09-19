@@ -760,6 +760,7 @@ fun DashboardScreen(
                 icon = Icons.Default.Chat,
                 title = "CHAT",
                 onClick = {
+                    onNewChat()
                     onNavigate(VisionTab.CHAT)
                 }
             )
@@ -794,6 +795,7 @@ fun DashboardScreen(
                 icon = Icons.Default.Mic,
                 title = "VOICE",
                 onClick = {
+                    onNewChat()
                     onStartVoiceCall()
                 }
             )
