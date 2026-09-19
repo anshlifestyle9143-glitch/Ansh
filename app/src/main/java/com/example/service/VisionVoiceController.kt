@@ -118,6 +118,12 @@ class VisionVoiceController(
                     return@launch
                 }
 
+                /*
+                 * Start the idle timer before listening begins.
+                 *
+                 * The timer is cancelled automatically when
+                 * the user starts speaking.
+                 */
                 startIdleTimeout()
 
                 listenForInput()
@@ -147,8 +153,7 @@ class VisionVoiceController(
 
             cancelIdleTimeout()
 
-            stop()
-            onDismissCallback()
+            dismissSession()
 
             return
         }
@@ -216,6 +221,13 @@ class VisionVoiceController(
                         delay(250L)
 
                         if (active) {
+
+                            /*
+                             * Start a fresh idle timer for the
+                             * new listening cycle.
+                             */
+                            startIdleTimeout()
+
                             listenForInput()
                         }
                     }
@@ -283,6 +295,13 @@ class VisionVoiceController(
                         delay(350L)
 
                         if (active) {
+
+                            /*
+                             * Start a fresh idle timer for the
+                             * retry listening cycle.
+                             */
+                            startIdleTimeout()
+
                             listenForInput()
                         }
                     }
@@ -294,8 +313,7 @@ class VisionVoiceController(
                         "Speech recognition retries exhausted"
                     )
 
-                    stop()
-                    onDismissCallback()
+                    dismissSession()
                 }
             },
 
@@ -326,22 +344,27 @@ class VisionVoiceController(
 
                 delay(IDLE_TIMEOUT_MS)
 
-                if (
-                    !active ||
-                    processing
-                ) {
+                if (!active) {
                     return@launch
                 }
 
+                /*
+                 * IMPORTANT:
+                 *
+                 * Do NOT check 'processing' here.
+                 *
+                 * listenForInput() sets processing = true while
+                 * SpeechRecognizer is active. If we checked
+                 * processing, the 6-second timeout could never
+                 * dismiss an untouched listening session.
+                 */
                 Log.d(
                     TAG,
                     "Voice idle timeout reached - " +
                         "dismissing session"
                 )
 
-                stop()
-
-                onDismissCallback()
+                dismissSession()
             }
     }
 
@@ -349,6 +372,43 @@ class VisionVoiceController(
 
         idleTimeoutJob?.cancel()
         idleTimeoutJob = null
+    }
+
+    /*
+     * ------------------------------------------------------------
+     * DISMISS SESSION
+     * ------------------------------------------------------------
+     *
+     * stop() clears all callbacks.
+     *
+     * Therefore we MUST capture the dismiss callback BEFORE
+     * calling stop().
+     */
+    private fun dismissSession() {
+
+        if (!active) {
+            return
+        }
+
+        Log.d(
+            TAG,
+            "Dismissing voice session"
+        )
+
+        val dismissCallback =
+            onDismissCallback
+
+        stop()
+
+        try {
+            dismissCallback()
+        } catch (e: Exception) {
+            Log.e(
+                TAG,
+                "Dismiss callback failed",
+                e
+            )
+        }
     }
 
     private fun classifyIntent(
@@ -496,6 +556,12 @@ class VisionVoiceController(
                             return@launch
                         }
 
+                        /*
+                         * Start a fresh idle timer before listening
+                         * again after the clarification message.
+                         */
+                        startIdleTimeout()
+
                         listenForInput()
                     }
                 }
@@ -600,7 +666,13 @@ class VisionVoiceController(
             delay(delayMs)
 
             if (active) {
+
+                /*
+                 * Every new listening cycle gets its own
+                 * fresh 6-second idle timer.
+                 */
                 startIdleTimeout()
+
                 listenForInput()
             }
         }
