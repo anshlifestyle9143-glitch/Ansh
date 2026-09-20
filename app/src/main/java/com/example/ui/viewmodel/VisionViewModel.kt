@@ -5,6 +5,7 @@ import android.content.Intent
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import android.content.Context
 import com.example.data.auth.AuthManager
 import com.example.data.local.VisionDatabase
 import com.example.data.model.AiEngineType
