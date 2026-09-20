@@ -544,28 +544,29 @@ class VisionViewModel(application: Application) : AndroidViewModel(application) 
      * ---------------------------------------------------------
      */
 
-    fun setWakeWordEnabled(
-        enabled: Boolean
-    ) {
-
-        /*
-         * Save the user's choice permanently.
-         */
-        preferences
-            .edit()
-            .putBoolean(
-                PREF_WAKE_WORD_ENABLED,
-                enabled
-            )
-            .apply()
-
-        _wakeWordEnabled.value =
-            enabled
-
+    fun setWakeWordEnabled(enabled: Boolean) {
+        _wakeWordEnabled.value = enabled
         if (enabled) {
+            requestBatteryOptimizationExemption()
             startWakeWordService()
         } else {
             stopWakeWordService()
+        }
+    }
+
+    private fun requestBatteryOptimizationExemption() {
+        val context = getApplication<Application>()
+        val powerManager = context.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+        if (!powerManager.isIgnoringBatteryOptimizations(context.packageName)) {
+            val intent = Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                data = android.net.Uri.parse("package:${context.packageName}")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            try {
+                context.startActivity(intent)
+            } catch (e: Exception) {
+                // some OEMs block this intent; ignore silently
+            }
         }
     }
 
