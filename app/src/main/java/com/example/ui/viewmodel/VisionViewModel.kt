@@ -32,7 +32,7 @@ class VisionViewModel(application: Application) : AndroidViewModel(application) 
         VisionDatabase.getDatabase(application, viewModelScope)
 
     private val repository =
-        VisionRepository(database.visionDao())
+        VisionRepository(database.visionDao(), application)
 
     val ttsManager = TtsManager(application)
 
