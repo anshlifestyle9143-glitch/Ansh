@@ -42,7 +42,15 @@ class WakeWordService : Service() {
 
     private val serviceScope =
         CoroutineScope(
-            Dispatchers.Default + SupervisorJob()
+            Dispatchers.Default +
+                SupervisorJob() +
+                kotlinx.coroutines.CoroutineExceptionHandler { _, e ->
+                    Log.e(
+                        TAG,
+                        "Uncaught coroutine error — service stays alive",
+                        e
+                    )
+                }
         )
 
     private val mainHandler =
@@ -367,93 +375,77 @@ class WakeWordService : Service() {
 
         mainHandler.post {
 
-            if (voiceActive) {
-                return@post
-            }
+            try {
 
-            if (
-                ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.RECORD_AUDIO
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
+                if (voiceActive) {
+                    return@post
+                }
 
-                Log.w(
-                    TAG,
-                    "Microphone permission not granted"
-                )
+                if (
+                    ContextCompat.checkSelfPermission(
+                        this,
+                        Manifest.permission.RECORD_AUDIO
+                    ) != PackageManager.PERMISSION_GRANTED
+                ) {
 
-                finishVoiceSession()
-                return@post
-            }
-
-            /*
-             * New voice conversation starts here.
-             */
-            voiceSessionId = null
-            voiceActive = true
-
-            Log.d(
-                TAG,
-                "Starting VisionVoiceController"
-            )
-
-            voiceController?.start(
-
-                onListening = {
-
-                    Log.d(
+                    Log.w(
                         TAG,
-                        "Vision voice: LISTENING"
-                    )
-                },
-
-                onThinking = {
-
-                    Log.d(
-                        TAG,
-                        "Vision voice: THINKING"
-                    )
-                },
-
-                onSpeaking = {
-
-                    Log.d(
-                        TAG,
-                        "Vision voice: SPEAKING"
-                    )
-                },
-
-                onConversation = { text ->
-
-                    Log.d(
-                        TAG,
-                        "Conversation input: $text"
-                    )
-
-                    handleAiConversation(text)
-                },
-
-                onCommand = { command ->
-
-                    Log.d(
-                        TAG,
-                        "Command input: $command"
-                    )
-
-                    executeCommand(command)
-                },
-
-                onDismiss = {
-
-                    Log.d(
-                        TAG,
-                        "Voice session dismissed"
+                        "Microphone permission not granted"
                     )
 
                     finishVoiceSession()
+                    return@post
                 }
-            )
+
+                voiceSessionId = null
+                voiceActive = true
+
+                Log.d(
+                    TAG,
+                    "Starting VisionVoiceController"
+                )
+
+                voiceController?.start(
+
+                    onListening = {
+                        Log.d(TAG, "Vision voice: LISTENING")
+                    },
+
+                    onThinking = {
+                        Log.d(TAG, "Vision voice: THINKING")
+                    },
+
+                    onSpeaking = {
+                        Log.d(TAG, "Vision voice: SPEAKING")
+                    },
+
+                    onConversation = { text ->
+                        Log.d(TAG, "Conversation input: $text")
+                        handleAiConversation(text)
+                    },
+
+                    onCommand = { command ->
+                        Log.d(TAG, "Command input: $command")
+                        executeCommand(command)
+                    },
+
+                    onDismiss = {
+                        Log.d(TAG, "Voice session dismissed")
+                        finishVoiceSession()
+                    }
+                )
+
+            } catch (e: Exception) {
+
+                Log.e(
+                    TAG,
+                    "startVoiceController crashed — recovering",
+                    e
+                )
+
+                voiceActive = false
+                finishVoiceSession()
+            }
         }
     }
 
