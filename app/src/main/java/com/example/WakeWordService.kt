@@ -244,6 +244,17 @@ class WakeWordService : Service() {
                         startVoiceController()
                     }
 
+                } catch (e: kotlinx.coroutines.CancellationException) {
+
+                    // Normal cancellation — a new detection cycle
+                    // replaced this one. This is NOT a crash and
+                    // must NOT trigger scheduleRestart(), otherwise
+                    // it creates an infinite restart loop.
+                    Log.d(
+                        TAG,
+                        "Wake-word detection job cancelled (normal)"
+                    )
+
                 } catch (e: Exception) {
 
                     Log.e(
