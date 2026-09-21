@@ -836,35 +836,51 @@ class WakeWordService : Service() {
 
         mainHandler.post {
 
-            if (
-                running ||
-                voiceActive
-            ) {
-                return@post
-            }
+            try {
 
-            Log.d(
-                TAG,
-                "Returning to passive wake-word listening"
-            )
-
-            wakeWordEngine?.let { engine ->
-
-                try {
-                    engine.stop()
-                } catch (_: Exception) {
+                if (
+                    running ||
+                    voiceActive
+                ) {
+                    return@post
                 }
 
-                try {
-                    engine.release()
-                } catch (_: Exception) {
+                Log.d(
+                    TAG,
+                    "Returning to passive wake-word listening"
+                )
+
+                wakeWordEngine?.let { engine ->
+
+                    try {
+                        engine.stop()
+                    } catch (_: Exception) {
+                    }
+
+                    try {
+                        engine.release()
+                    } catch (_: Exception) {
+                    }
                 }
+
+                wakeWordEngine =
+                    createWakeWordEngine()
+
+                startWakeWordDetection()
+
+            } catch (e: Exception) {
+
+                Log.e(
+                    TAG,
+                    "restartWakeWordDetection crashed — recovering",
+                    e
+                )
+
+                wakeWordEngine = null
+                running = false
+
+                scheduleRestart()
             }
-
-            wakeWordEngine =
-                createWakeWordEngine()
-
-            startWakeWordDetection()
         }
     }
 
