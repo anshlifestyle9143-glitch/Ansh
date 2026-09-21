@@ -1,5 +1,6 @@
 package com.example.data.repository
 
+import android.content.Context
 import android.util.Log
 import com.example.data.api.GeminiContent
 import com.example.data.api.GeminiGenerationConfig
@@ -11,6 +12,8 @@ import com.example.data.model.AiEngineType
 import com.example.data.model.ChatMessage
 import com.example.data.model.ChatSession
 import com.example.data.model.MemoryFact
+import com.example.service.VisionCommandExecutor
+import com.example.service.VisionIntentClassifier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
@@ -18,7 +21,10 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 
-class VisionRepository(private val dao: VisionDao) {
+class VisionRepository(
+    private val dao: VisionDao,
+    private val appContext: Context
+) {
 
     val allSessions: Flow<List<ChatSession>> = dao.getAllSessions()
     val allMemories: Flow<List<MemoryFact>> = dao.getAllMemories()
@@ -167,6 +173,49 @@ class VisionRepository(private val dao: VisionDao) {
         )
 
         saveMessage(userMessage)
+
+        /*
+         * -------------------------------------------------------
+         * DEVICE COMMAND CHECK
+         * -------------------------------------------------------
+         *
+         * Typed chat messages now go through the same semantic
+         * intent check as voice input. If this is a real device
+         * action (e.g. "flashlight on karo"), it gets EXECUTED
+         * here instead of just being described by the chat model.
+         */
+        val intentResult = try {
+            VisionIntentClassifier().classify(userPrompt)
+        } catch (e: Exception) {
+            null
+        }
+
+        if (intentResult?.type == VisionIntentClassifier.IntentType.ACTION) {
+
+            val commandResult = try {
+                VisionCommandExecutor(appContext).execute(userPrompt)
+            } catch (e: Exception) {
+                VisionCommandExecutor.CommandResult(
+                    success = false,
+                    action = "UNKNOWN",
+                    message = "Command execute nahi ho payi, Boss."
+                )
+            }
+
+            val latency = System.currentTimeMillis() - startTime
+
+            val assistantMsg = ChatMessage(
+                sessionId = sessionId,
+                role = "ASSISTANT",
+                content = commandResult.message,
+                engineName = engineType.displayName,
+                latencyMs = latency
+            )
+
+            saveMessage(assistantMsg)
+
+            return@withContext Result.success(assistantMsg)
+        }
 
         val recentHistory =
             dao.getRecentMessages(sessionId, limit = 8).reversed()
