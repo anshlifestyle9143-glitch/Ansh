@@ -112,7 +112,8 @@ class WakeWordService : Service() {
 
         visionRepository =
             VisionRepository(
-                database.visionDao()
+                database.visionDao(),
+                this
             )
 
         voiceController =
