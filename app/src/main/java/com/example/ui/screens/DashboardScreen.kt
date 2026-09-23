@@ -53,6 +53,7 @@ import com.example.ui.components.VisionTab
 import com.example.ui.viewmodel.VisionViewModel
 import kotlin.math.cos
 import kotlin.math.sin
+import androidx.compose.foundation.background
 
 // ================================================================
 // NEW DESIGN COLORS
