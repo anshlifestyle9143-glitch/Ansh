@@ -1,30 +1,50 @@
 package com.example.ui.screens
 
-import androidx.compose.animation.core.*
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.runtime.*
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.VisionTab
-import com.example.viewmodel.VisionViewModel
+import com.example.ui.components.VisionTab
+import com.example.ui.viewmodel.VisionViewModel
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -45,58 +65,57 @@ fun DashboardScreen(
     onShowHistory: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "dashboard")
 
-    val rotation by infiniteTransition.animateFloat(
+    val infinite = rememberInfiniteTransition(label = "vision_dashboard")
+
+    val rotation by infinite.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
         animationSpec = infiniteRepeatable(
             animation = tween(
                 durationMillis = 18000,
                 easing = LinearEasing
-            ),
-            repeatMode = RepeatMode.Restart
+            )
         ),
-        label = "rotation"
+        label = "orbit_rotation"
     )
 
-    val reverseRotation by infiniteTransition.animateFloat(
+    val reverseRotation by infinite.animateFloat(
         initialValue = 360f,
         targetValue = 0f,
         animationSpec = infiniteRepeatable(
             animation = tween(
-                durationMillis = 12000,
+                durationMillis = 24000,
                 easing = LinearEasing
-            ),
-            repeatMode = RepeatMode.Restart
+            )
         ),
-        label = "reverse_rotation"
+        label = "reverse_orbit"
     )
 
-    val pulse by infiniteTransition.animateFloat(
-        initialValue = 0.96f,
-        targetValue = 1.04f,
+    val pulse by infinite.animateFloat(
+        initialValue = 0.94f,
+        targetValue = 1.06f,
         animationSpec = infiniteRepeatable(
             animation = tween(
-                durationMillis = 2200,
-                easing = EaseInOut
+                durationMillis = 1700,
+                easing = FastOutSlowInEasing
             ),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "pulse"
+        label = "core_pulse"
     )
 
-    val glow by infiniteTransition.animateFloat(
-        initialValue = 0.35f,
-        targetValue = 0.75f,
+    val glow by infinite.animateFloat(
+        initialValue = 0.55f,
+        targetValue = 1f,
         animationSpec = infiniteRepeatable(
             animation = tween(
-                durationMillis = 1800,
-                easing = EaseInOut
+                durationMillis = 1500,
+                easing = FastOutSlowInEasing
             ),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "glow"
+        label = "core_glow"
     )
 
     Box(
@@ -105,639 +124,804 @@ fun DashboardScreen(
             .background(VisionBlack)
     ) {
 
-        // ---------------------------------------------------------
-        // TOP STATUS
-        // ---------------------------------------------------------
+        /*
+         * =========================================================
+         * TOP SYSTEM STATUS
+         * =========================================================
+         */
 
-        Row(
+        Column(
             modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 24.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .fillMaxWidth()
+                .padding(top = 28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
 
             Box(
                 modifier = Modifier
-                    .size(8.dp)
-                    .clip(CircleShape)
-                    .background(NeonCyan)
-            )
+                    .clip(RoundedCornerShape(40.dp))
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(
+                                NeonCyan.copy(alpha = 0.10f),
+                                NeonBlue.copy(alpha = 0.08f),
+                                NeonPurple.copy(alpha = 0.10f)
+                            )
+                        )
+                    )
+                    .padding(
+                        horizontal = 30.dp,
+                        vertical = 10.dp
+                    )
+            ) {
 
-            Spacer(modifier = Modifier.width(8.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
 
-            androidx.compose.material3.Text(
-                text = "SYSTEM LIVE",
-                color = BrightWhite,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 2.sp
-            )
+                    Box(
+                        modifier = Modifier
+                            .size(9.dp)
+                            .clip(CircleShape)
+                            .background(NeonCyan)
+                    )
 
-            Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.size(11.dp))
 
-            androidx.compose.material3.Text(
-                text = "•",
-                color = NeonPurple,
-                fontSize = 14.sp
-            )
+                    Text(
+                        text = "SYSTEM LIVE",
+                        color = NeonCyan,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 2.sp
+                    )
+                }
+            }
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            androidx.compose.material3.Text(
+            Text(
                 text = "Vision Core",
                 color = MutedBlue,
-                fontSize = 11.sp,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Medium,
                 letterSpacing = 1.sp
             )
         }
 
-        // ---------------------------------------------------------
-        // MAIN ORBITAL CORE
-        // ---------------------------------------------------------
+        /*
+         * =========================================================
+         * MAIN ORBITAL CORE
+         * =========================================================
+         */
 
         Box(
             modifier = Modifier
-                .align(Alignment.Center)
-                .size(330.dp),
-            contentAlignment = Alignment.Center
+                .fillMaxSize()
+                .padding(top = 155.dp, bottom = 145.dp)
         ) {
 
+            /*
+             * =====================================================
+             * ORBIT CANVAS
+             * =====================================================
+             */
+
             Canvas(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .rotate(rotation)
+                modifier = Modifier.fillMaxSize()
             ) {
 
-                val center = Offset(
-                    size.width / 2f,
-                    size.height / 2f
-                )
+                val centerX = size.width / 2f
+                val centerY = size.height / 2f
 
-                val radius = size.minDimension / 2f
+                val baseRadius =
+                    minOf(size.width, size.height) * 0.39f
 
-                // Outer glow
+                /*
+                 * -------------------------
+                 * SOFT CENTRAL GLOW
+                 * -------------------------
+                 */
+
                 drawCircle(
                     brush = Brush.radialGradient(
                         colors = listOf(
-                            NeonBlue.copy(alpha = 0.16f),
-                            NeonPurple.copy(alpha = 0.08f),
+                            NeonPurple.copy(alpha = 0.30f * glow),
+                            NeonBlue.copy(alpha = 0.13f * glow),
                             Color.Transparent
                         ),
-                        center = center,
-                        radius = radius
+                        center = androidx.compose.ui.geometry.Offset(
+                            centerX,
+                            centerY
+                        ),
+                        radius = baseRadius * 0.78f
                     ),
-                    center = center,
-                    radius = radius
+                    radius = baseRadius * 0.78f,
+                    center = androidx.compose.ui.geometry.Offset(
+                        centerX,
+                        centerY
+                    )
                 )
 
-                // Outer orbit
+                /*
+                 * -------------------------
+                 * OUTER ORBIT
+                 * -------------------------
+                 */
+
                 drawCircle(
-                    color = NeonBlue.copy(alpha = 0.22f),
-                    center = center,
-                    radius = radius - 18.dp.toPx(),
-                    style = Stroke(
-                        width = 1.2.dp.toPx()
-                    )
+                    color = NeonPurple.copy(alpha = 0.72f),
+                    radius = baseRadius,
+                    center = androidx.compose.ui.geometry.Offset(
+                        centerX,
+                        centerY
+                    ),
+                    style = Stroke(width = 2.5f)
                 )
 
-                // Second orbit
+                /*
+                 * -------------------------
+                 * SECOND ORBIT
+                 * -------------------------
+                 */
+
                 drawCircle(
-                    color = NeonPurple.copy(alpha = 0.25f),
-                    center = center,
-                    radius = radius - 38.dp.toPx(),
-                    style = Stroke(
-                        width = 1.dp.toPx()
-                    )
+                    color = NeonBlue.copy(alpha = 0.82f),
+                    radius = baseRadius * 0.82f,
+                    center = androidx.compose.ui.geometry.Offset(
+                        centerX,
+                        centerY
+                    ),
+                    style = Stroke(width = 3f)
                 )
 
-                // Rotating arc
+                /*
+                 * -------------------------
+                 * INNER ORBIT
+                 * -------------------------
+                 */
+
+                drawCircle(
+                    color = NeonPurple.copy(alpha = 0.88f),
+                    radius = baseRadius * 0.61f,
+                    center = androidx.compose.ui.geometry.Offset(
+                        centerX,
+                        centerY
+                    ),
+                    style = Stroke(width = 3f)
+                )
+
+                /*
+                 * -------------------------
+                 * CYAN ORBIT
+                 * -------------------------
+                 */
+
+                drawCircle(
+                    color = NeonCyan.copy(alpha = 0.72f),
+                    radius = baseRadius * 0.48f,
+                    center = androidx.compose.ui.geometry.Offset(
+                        centerX,
+                        centerY
+                    ),
+                    style = Stroke(width = 2.5f)
+                )
+
+                /*
+                 * =================================================
+                 * ROTATING ARC SYSTEM
+                 * =================================================
+                 */
+
+                val arcRectSize = baseRadius * 2f
+
+                val arcTopLeft = androidx.compose.ui.geometry.Offset(
+                    centerX - baseRadius,
+                    centerY - baseRadius
+                )
+
                 drawArc(
-                    color = NeonCyan.copy(alpha = 0.8f),
-                    startAngle = 20f,
-                    sweepAngle = 80f,
+                    color = NeonCyan,
+                    startAngle = rotation,
+                    sweepAngle = 72f,
                     useCenter = false,
-                    topLeft = Offset(
-                        center.x - radius + 18.dp.toPx(),
-                        center.y - radius + 18.dp.toPx()
-                    ),
-                    size = Size(
-                        (radius - 18.dp.toPx()) * 2f,
-                        (radius - 18.dp.toPx()) * 2f
+                    topLeft = arcTopLeft,
+                    size = androidx.compose.ui.geometry.Size(
+                        arcRectSize,
+                        arcRectSize
                     ),
                     style = Stroke(
-                        width = 2.dp.toPx()
+                        width = 5f,
+                        cap = StrokeCap.Round
                     )
                 )
 
-                // Purple rotating arc
                 drawArc(
-                    color = NeonPurple.copy(alpha = 0.7f),
-                    startAngle = 210f,
-                    sweepAngle = 65f,
+                    color = NeonPurple,
+                    startAngle = rotation + 115f,
+                    sweepAngle = 95f,
                     useCenter = false,
-                    topLeft = Offset(
-                        center.x - radius + 38.dp.toPx(),
-                        center.y - radius + 38.dp.toPx()
-                    ),
-                    size = Size(
-                        (radius - 38.dp.toPx()) * 2f,
-                        (radius - 38.dp.toPx()) * 2f
+                    topLeft = arcTopLeft,
+                    size = androidx.compose.ui.geometry.Size(
+                        arcRectSize,
+                        arcRectSize
                     ),
                     style = Stroke(
-                        width = 2.dp.toPx()
+                        width = 4f,
+                        cap = StrokeCap.Round
                     )
                 )
 
-                // Orbital points
-                val points = listOf(
-                    0f,
-                    60f,
-                    120f,
-                    180f,
-                    240f,
-                    300f
+                drawArc(
+                    color = NeonBlue,
+                    startAngle = reverseRotation + 40f,
+                    sweepAngle = 55f,
+                    useCenter = false,
+                    topLeft = arcTopLeft,
+                    size = androidx.compose.ui.geometry.Size(
+                        arcRectSize,
+                        arcRectSize
+                    ),
+                    style = Stroke(
+                        width = 5f,
+                        cap = StrokeCap.Round
+                    )
                 )
 
-                points.forEach { angle ->
+                /*
+                 * =================================================
+                 * SECOND ROTATING RING
+                 * =================================================
+                 */
 
-                    val radians = Math.toRadians(angle.toDouble())
+                val secondRadius = baseRadius * 0.82f
 
-                    val x = center.x +
-                            cos(radians).toFloat() *
-                            (radius - 18.dp.toPx())
+                val secondTopLeft = androidx.compose.ui.geometry.Offset(
+                    centerX - secondRadius,
+                    centerY - secondRadius
+                )
 
-                    val y = center.y +
-                            sin(radians).toFloat() *
-                            (radius - 18.dp.toPx())
+                drawArc(
+                    color = NeonPurple,
+                    startAngle = reverseRotation,
+                    sweepAngle = 70f,
+                    useCenter = false,
+                    topLeft = secondTopLeft,
+                    size = androidx.compose.ui.geometry.Size(
+                        secondRadius * 2f,
+                        secondRadius * 2f
+                    ),
+                    style = Stroke(
+                        width = 4f,
+                        cap = StrokeCap.Round
+                    )
+                )
+
+                drawArc(
+                    color = NeonCyan,
+                    startAngle = rotation + 170f,
+                    sweepAngle = 90f,
+                    useCenter = false,
+                    topLeft = secondTopLeft,
+                    size = androidx.compose.ui.geometry.Size(
+                        secondRadius * 2f,
+                        secondRadius * 2f
+                    ),
+                    style = Stroke(
+                        width = 3f,
+                        cap = StrokeCap.Round
+                    )
+                )
+
+                /*
+                 * =================================================
+                 * PARTICLES
+                 * =================================================
+                 */
+
+                val particleAngles = listOf(
+                    15f,
+                    48f,
+                    82f,
+                    118f,
+                    154f,
+                    190f,
+                    225f,
+                    260f,
+                    296f,
+                    330f
+                )
+
+                particleAngles.forEachIndexed { index, angle ->
+
+                    val radians =
+                        Math.toRadians(
+                            (angle + rotation * 0.15f).toDouble()
+                        )
+
+                    val radius =
+                        baseRadius * when (index % 3) {
+                            0 -> 0.56f
+                            1 -> 0.70f
+                            else -> 0.88f
+                        }
+
+                    val px =
+                        centerX + cos(radians).toFloat() * radius
+
+                    val py =
+                        centerY + sin(radians).toFloat() * radius
 
                     drawCircle(
-                        color = NeonCyan.copy(alpha = 0.8f),
-                        radius = 3.dp.toPx(),
-                        center = Offset(x, y)
+                        color =
+                            if (index % 2 == 0) {
+                                NeonCyan.copy(alpha = 0.85f)
+                            } else {
+                                NeonPurple.copy(alpha = 0.90f)
+                            },
+                        radius = if (index % 3 == 0) 4f else 2.5f,
+                        center = androidx.compose.ui.geometry.Offset(
+                            px,
+                            py
+                        )
+                    )
+                }
+
+                /*
+                 * =================================================
+                 * SMALL ORBITAL POINTS
+                 * =================================================
+                 */
+
+                val smallAngles = listOf(
+                    35f,
+                    110f,
+                    200f,
+                    285f
+                )
+
+                smallAngles.forEach { angle ->
+
+                    val radians =
+                        Math.toRadians(
+                            (angle + reverseRotation * 0.10f).toDouble()
+                        )
+
+                    val radius = baseRadius * 0.44f
+
+                    val px =
+                        centerX + cos(radians).toFloat() * radius
+
+                    val py =
+                        centerY + sin(radians).toFloat() * radius
+
+                    drawCircle(
+                        color = NeonBlue.copy(alpha = 0.90f),
+                        radius = 5f,
+                        center = androidx.compose.ui.geometry.Offset(
+                            px,
+                            py
+                        )
                     )
                 }
             }
 
-            // Inner rotating orbit
-            Canvas(
-                modifier = Modifier
-                    .size(275.dp)
-                    .rotate(reverseRotation)
-            ) {
-
-                val center = Offset(
-                    size.width / 2f,
-                    size.height / 2f
-                )
-
-                val radius = size.minDimension / 2f
-
-                drawArc(
-                    color = NeonPurple.copy(alpha = 0.55f),
-                    startAngle = 120f,
-                    sweepAngle = 120f,
-                    useCenter = false,
-                    topLeft = Offset.Zero,
-                    size = size,
-                    style = Stroke(
-                        width = 1.5.dp.toPx()
-                    )
-                )
-
-                drawArc(
-                    color = NeonBlue.copy(alpha = 0.5f),
-                    startAngle = 300f,
-                    sweepAngle = 80f,
-                    useCenter = false,
-                    topLeft = Offset.Zero,
-                    size = size,
-                    style = Stroke(
-                        width = 1.5.dp.toPx()
-                    )
-                )
-
-                drawCircle(
-                    color = NeonBlue.copy(alpha = 0.12f),
-                    center = center,
-                    radius = radius - 25.dp.toPx(),
-                    style = Stroke(
-                        width = 1.dp.toPx()
-                    )
-                )
-            }
-
-            // -----------------------------------------------------
-            // CENTRAL VISION CORE
-            // -----------------------------------------------------
+            /*
+             * =====================================================
+             * CENTER VISION CORE
+             * =====================================================
+             */
 
             Box(
                 modifier = Modifier
+                    .align(Alignment.Center)
                     .size(205.dp)
-                    .scale(pulse),
+                    .graphicsLayer {
+                        scaleX = pulse
+                        scaleY = pulse
+                    }
+                    .clip(CircleShape)
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(
+                                NeonBlue.copy(alpha = 0.32f),
+                                NeonPurple.copy(alpha = 0.25f),
+                                Color(0xFF030714),
+                                Color.Black
+                            )
+                        )
+                    ),
                 contentAlignment = Alignment.Center
             ) {
 
+                /*
+                 * INNER GLOBE
+                 */
+
                 Canvas(
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.size(145.dp)
                 ) {
 
-                    val center = Offset(
-                        size.width / 2f,
-                        size.height / 2f
-                    )
+                    val cx = size.width / 2f
+                    val cy = size.height / 2f
+                    val r = size.minDimension * 0.43f
 
-                    val radius = size.minDimension / 2f
+                    /*
+                     * Globe glow
+                     */
 
-                    // Core glow
                     drawCircle(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                NeonBlue.copy(alpha = glow),
-                                NeonPurple.copy(alpha = glow * 0.5f),
-                                Color.Transparent
-                            ),
-                            center = center,
-                            radius = radius
+                        color = NeonBlue.copy(
+                            alpha = 0.18f * glow
                         ),
-                        center = center,
-                        radius = radius
-                    )
-
-                    // Core outer circle
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                Color(0xFF071C3A),
-                                Color(0xFF040817),
-                                VisionBlack
-                            )
-                        ),
-                        center = center,
-                        radius = radius - 5.dp.toPx()
-                    )
-
-                    // Outer ring
-                    drawCircle(
-                        color = NeonBlue.copy(alpha = 0.7f),
-                        center = center,
-                        radius = radius - 6.dp.toPx(),
-                        style = Stroke(
-                            width = 2.dp.toPx()
+                        radius = r * 1.25f,
+                        center = androidx.compose.ui.geometry.Offset(
+                            cx,
+                            cy
                         )
                     )
 
-                    // Inner ring
+                    /*
+                     * Globe outer ring
+                     */
+
                     drawCircle(
+                        color = NeonCyan.copy(alpha = 0.90f),
+                        radius = r,
+                        center = androidx.compose.ui.geometry.Offset(
+                            cx,
+                            cy
+                        ),
+                        style = Stroke(width = 2.5f)
+                    )
+
+                    drawCircle(
+                        color = NeonPurple.copy(alpha = 0.70f),
+                        radius = r * 0.90f,
+                        center = androidx.compose.ui.geometry.Offset(
+                            cx,
+                            cy
+                        ),
+                        style = Stroke(width = 1.5f)
+                    )
+
+                    /*
+                     * Longitude lines
+                     */
+
+                    val globeTopLeft =
+                        androidx.compose.ui.geometry.Offset(
+                            cx - r,
+                            cy - r
+                        )
+
+                    val globeSize =
+                        androidx.compose.ui.geometry.Size(
+                            r * 2f,
+                            r * 2f
+                        )
+
+                    drawOval(
+                        color = NeonBlue.copy(alpha = 0.55f),
+                        topLeft = globeTopLeft,
+                        size = globeSize,
+                        style = Stroke(width = 1.2f)
+                    )
+
+                    drawOval(
+                        color = NeonPurple.copy(alpha = 0.55f),
+                        topLeft = androidx.compose.ui.geometry.Offset(
+                            cx - r * 0.55f,
+                            cy - r
+                        ),
+                        size = androidx.compose.ui.geometry.Size(
+                            r * 1.10f,
+                            r * 2f
+                        ),
+                        style = Stroke(width = 1.2f)
+                    )
+
+                    drawOval(
+                        color = NeonCyan.copy(alpha = 0.42f),
+                        topLeft = androidx.compose.ui.geometry.Offset(
+                            cx - r * 0.30f,
+                            cy - r
+                        ),
+                        size = androidx.compose.ui.geometry.Size(
+                            r * 0.60f,
+                            r * 2f
+                        ),
+                        style = Stroke(width = 1f)
+                    )
+
+                    /*
+                     * Latitude lines
+                     */
+
+                    drawOval(
+                        color = NeonPurple.copy(alpha = 0.48f),
+                        topLeft = androidx.compose.ui.geometry.Offset(
+                            cx - r,
+                            cy - r * 0.58f
+                        ),
+                        size = androidx.compose.ui.geometry.Size(
+                            r * 2f,
+                            r * 1.16f
+                        ),
+                        style = Stroke(width = 1f)
+                    )
+
+                    drawOval(
+                        color = NeonCyan.copy(alpha = 0.48f),
+                        topLeft = androidx.compose.ui.geometry.Offset(
+                            cx - r,
+                            cy - r * 0.28f
+                        ),
+                        size = androidx.compose.ui.geometry.Size(
+                            r * 2f,
+                            r * 0.56f
+                        ),
+                        style = Stroke(width = 1f)
+                    )
+
+                    drawOval(
                         color = NeonPurple.copy(alpha = 0.45f),
-                        center = center,
-                        radius = radius - 18.dp.toPx(),
-                        style = Stroke(
-                            width = 1.dp.toPx()
-                        )
-                    )
-                }
-
-                // -------------------------------------------------
-                // DIGITAL GLOBE
-                // -------------------------------------------------
-
-                Canvas(
-                    modifier = Modifier
-                        .size(145.dp)
-                ) {
-
-                    val center = Offset(
-                        size.width / 2f,
-                        size.height / 2f
+                        topLeft = androidx.compose.ui.geometry.Offset(
+                            cx - r,
+                            cy + r * 0.20f
+                        ),
+                        size = androidx.compose.ui.geometry.Size(
+                            r * 2f,
+                            r * 0.56f
+                        ),
+                        style = Stroke(width = 1f)
                     )
 
-                    val radius = size.minDimension / 2f
+                    /*
+                     * Globe particles
+                     */
 
-                    // Globe
-                    drawCircle(
-                        color = NeonBlue.copy(alpha = 0.06f),
-                        center = center,
-                        radius = radius
-                    )
+                    for (i in 0 until 14) {
 
-                    drawCircle(
-                        color = NeonCyan.copy(alpha = 0.55f),
-                        center = center,
-                        radius = radius - 2.dp.toPx(),
-                        style = Stroke(
-                            width = 1.dp.toPx()
-                        )
-                    )
+                        val angle =
+                            Math.toRadians(
+                                (i * 27 + rotation * 0.4f).toDouble()
+                            )
 
-                    // Latitude
-                    drawOval(
-                        color = NeonBlue.copy(alpha = 0.3f),
-                        topLeft = Offset(
-                            center.x - radius,
-                            center.y - radius * 0.45f
-                        ),
-                        size = Size(
-                            radius * 2f,
-                            radius * 0.9f
-                        ),
-                        style = Stroke(
-                            width = 0.8.dp.toPx()
-                        )
-                    )
+                        val rr =
+                            r * (0.45f + (i % 4) * 0.10f)
 
-                    drawOval(
-                        color = NeonBlue.copy(alpha = 0.3f),
-                        topLeft = Offset(
-                            center.x - radius,
-                            center.y - radius * 0.15f
-                        ),
-                        size = Size(
-                            radius * 2f,
-                            radius * 0.3f
-                        ),
-                        style = Stroke(
-                            width = 0.8.dp.toPx()
-                        )
-                    )
+                        val px =
+                            cx + cos(angle).toFloat() * rr
 
-                    drawOval(
-                        color = NeonBlue.copy(alpha = 0.3f),
-                        topLeft = Offset(
-                            center.x - radius,
-                            center.y + radius * 0.15f
-                        ),
-                        size = Size(
-                            radius * 2f,
-                            radius * 0.3f
-                        ),
-                        style = Stroke(
-                            width = 0.8.dp.toPx()
-                        )
-                    )
-
-                    // Longitude
-                    drawOval(
-                        color = NeonPurple.copy(alpha = 0.3f),
-                        topLeft = Offset(
-                            center.x - radius * 0.45f,
-                            center.y - radius
-                        ),
-                        size = Size(
-                            radius * 0.9f,
-                            radius * 2f
-                        ),
-                        style = Stroke(
-                            width = 0.8.dp.toPx()
-                        )
-                    )
-
-                    drawOval(
-                        color = NeonPurple.copy(alpha = 0.3f),
-                        topLeft = Offset(
-                            center.x - radius * 0.15f,
-                            center.y - radius
-                        ),
-                        size = Size(
-                            radius * 0.3f,
-                            radius * 2f
-                        ),
-                        style = Stroke(
-                            width = 0.8.dp.toPx()
-                        )
-                    )
-
-                    drawOval(
-                        color = NeonPurple.copy(alpha = 0.3f),
-                        topLeft = Offset(
-                            center.x + radius * 0.15f,
-                            center.y - radius
-                        ),
-                        size = Size(
-                            radius * 0.3f,
-                            radius * 2f
-                        ),
-                        style = Stroke(
-                            width = 0.8.dp.toPx()
-                        )
-                    )
-
-                    // Globe particles
-                    val particles = listOf(
-                        Offset(0.25f, 0.30f),
-                        Offset(0.70f, 0.25f),
-                        Offset(0.45f, 0.42f),
-                        Offset(0.65f, 0.58f),
-                        Offset(0.30f, 0.65f),
-                        Offset(0.52f, 0.76f),
-                        Offset(0.80f, 0.72f),
-                        Offset(0.18f, 0.48f)
-                    )
-
-                    particles.forEach { p ->
+                        val py =
+                            cy + sin(angle).toFloat() * rr
 
                         drawCircle(
-                            color = NeonCyan.copy(alpha = 0.7f),
-                            radius = 1.5.dp.toPx(),
-                            center = Offset(
-                                size.width * p.x,
-                                size.height * p.y
+                            color =
+                                if (i % 2 == 0) {
+                                    NeonCyan
+                                } else {
+                                    NeonPurple
+                                },
+                            radius = 1.8f,
+                            center = androidx.compose.ui.geometry.Offset(
+                                px,
+                                py
                             )
                         )
                     }
                 }
 
-                androidx.compose.material3.Text(
+                /*
+                 * BIG V
+                 */
+
+                Text(
                     text = "V",
                     color = BrightWhite,
-                    fontSize = 42.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = (-2).sp
+                    fontSize = 72.sp,
+                    fontWeight = FontWeight.Black,
+                    modifier = Modifier
+                        .graphicsLayer {
+                            shadowElevation = 30f
+                        }
                 )
             }
+
+            /*
+             * =====================================================
+             * VISION CORE LABEL
+             * =====================================================
+             */
+
+            Text(
+                text = "VISION CORE",
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .offset(y = 122.dp),
+                color = BrightWhite,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 3.sp
+            )
+
+            /*
+             * =====================================================
+             * CHAT 鈥� TOP
+             * =====================================================
+             */
+
+            DashboardAction(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .offset(y = 10.dp),
+                icon = Icons.Default.Chat,
+                title = "CHAT",
+                onClick = {
+                    onNewChat()
+                    onNavigate(VisionTab.CHAT)
+                }
+            )
+
+            /*
+             * =====================================================
+             * SETTINGS 鈥� LEFT
+             * =====================================================
+             */
+
+            DashboardAction(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .offset(x = 4.dp),
+                icon = Icons.Default.Settings,
+                title = "SETTINGS",
+                onClick = {
+                    onNavigate(VisionTab.SETTINGS)
+                }
+            )
+
+            /*
+             * =====================================================
+             * VOICE 鈥� RIGHT
+             * =====================================================
+             */
+
+            DashboardAction(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .offset(x = (-4).dp),
+                icon = Icons.Default.Mic,
+                title = "VOICE",
+                onClick = {
+                    onNewChat()
+                    onStartVoiceCall()
+                }
+            )
+
+            /*
+             * =====================================================
+             * HISTORY 鈥� BOTTOM
+             * =====================================================
+             */
+
+            DashboardAction(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .offset(y = (-4).dp),
+                icon = Icons.Default.History,
+                title = "HISTORY",
+                onClick = {
+                    onShowHistory()
+                }
+            )
         }
 
-        // ---------------------------------------------------------
-        // CORE LABEL
-        // ---------------------------------------------------------
+        /*
+         * =========================================================
+         * FOOTER
+         * =========================================================
+         */
 
-        androidx.compose.material3.Text(
-            text = "VISION CORE",
-            modifier = Modifier
-                .align(Alignment.Center)
-                .offset(y = 126.dp),
-            color = BrightWhite,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 4.sp
-        )
-
-        // ---------------------------------------------------------
-        // CHAT BUTTON
-        // ---------------------------------------------------------
-
-        DashboardAction(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .offset(y = (-165).dp),
-            icon = Icons.Default.Chat,
-            label = "CHAT",
-            accent = NeonBlue,
-            onClick = {
-                onNewChat()
-                onNavigate(VisionTab.CHAT)
-            }
-        )
-
-        // ---------------------------------------------------------
-        // SETTINGS BUTTON
-        // ---------------------------------------------------------
-
-        DashboardAction(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .offset(
-                    x = (-145).dp,
-                    y = (-5).dp
-                ),
-            icon = Icons.Default.Settings,
-            label = "SETTINGS",
-            accent = NeonPurple,
-            onClick = {
-                onNavigate(VisionTab.SETTINGS)
-            }
-        )
-
-        // ---------------------------------------------------------
-        // VOICE BUTTON
-        // ---------------------------------------------------------
-
-        DashboardAction(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .offset(
-                    x = 145.dp,
-                    y = (-5).dp
-                ),
-            icon = Icons.Default.Mic,
-            label = "VOICE",
-            accent = NeonCyan,
-            onClick = {
-                onNewChat()
-                onStartVoiceCall()
-            }
-        )
-
-        // ---------------------------------------------------------
-        // HISTORY BUTTON
-        // ---------------------------------------------------------
-
-        DashboardAction(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .offset(y = 165.dp),
-            icon = Icons.Default.History,
-            label = "HISTORY",
-            accent = NeonViolet,
-            onClick = {
-                onShowHistory()
-            }
-        )
-
-        // ---------------------------------------------------------
-        // FOOTER
-        // ---------------------------------------------------------
-
-        androidx.compose.material3.Text(
-            text = "T H I N K   •   A S K   •   E V O L V E",
+        Text(
+            text = "T H I N K   鈥�   A S K   鈥�   E V O L V E",
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 24.dp),
-            color = MutedBlue.copy(alpha = 0.75f),
-            fontSize = 9.sp,
+            color = MutedBlue.copy(alpha = 0.55f),
+            fontSize = 11.sp,
             fontWeight = FontWeight.Medium,
-            letterSpacing = 1.sp
+            letterSpacing = 2.sp
         )
     }
 }
 
 
-// ================================================================
-// DASHBOARD ACTION BUTTON
-// ================================================================
+/*
+ * =================================================================
+ * DASHBOARD ACTION BUTTON
+ * =================================================================
+ */
 
 @Composable
 private fun DashboardAction(
     modifier: Modifier = Modifier,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    accent: Color,
+    title: String,
     onClick: () -> Unit
 ) {
 
     Column(
-        modifier = modifier,
+        modifier = modifier
+            .clickable { onClick() },
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
 
-        androidx.compose.material3.IconButton(
-            onClick = onClick,
-            modifier = Modifier.size(66.dp)
+        Box(
+            modifier = Modifier
+                .size(82.dp)
+                .clip(CircleShape)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            Color(0xFF253E9A),
+                            Color(0xFF10134F),
+                            Color(0xFF070718)
+                        )
+                    )
+                ),
+            contentAlignment = Alignment.Center
         ) {
 
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(CircleShape)
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(
-                                accent.copy(alpha = 0.22f),
-                                Color(0xFF050817),
-                                VisionBlack
-                            )
-                        )
-                    ),
-                contentAlignment = Alignment.Center
+            /*
+             * Neon ring
+             */
+
+            Canvas(
+                modifier = Modifier.fillMaxSize()
             ) {
 
-                Canvas(
-                    modifier = Modifier.fillMaxSize()
-                ) {
+                drawCircle(
+                    color = NeonBlue.copy(alpha = 0.85f),
+                    radius = size.minDimension / 2f - 2f,
+                    style = Stroke(width = 2.5f)
+                )
 
-                    drawCircle(
-                        color = accent.copy(alpha = 0.65f),
-                        radius = size.minDimension / 2f - 2.dp.toPx(),
-                        style = Stroke(
-                            width = 1.5.dp.toPx()
-                        )
+                drawArc(
+                    color = NeonPurple,
+                    startAngle = 205f,
+                    sweepAngle = 125f,
+                    useCenter = false,
+                    topLeft = androidx.compose.ui.geometry.Offset(
+                        2f,
+                        2f
+                    ),
+                    size = androidx.compose.ui.geometry.Size(
+                        size.width - 4f,
+                        size.height - 4f
+                    ),
+                    style = Stroke(
+                        width = 3f,
+                        cap = StrokeCap.Round
                     )
-
-                    drawCircle(
-                        color = accent.copy(alpha = 0.18f),
-                        radius = size.minDimension / 2f - 8.dp.toPx(),
-                        style = Stroke(
-                            width = 1.dp.toPx()
-                        )
-                    )
-                }
-
-                androidx.compose.material3.Icon(
-                    imageVector = icon,
-                    contentDescription = label,
-                    tint = BrightWhite,
-                    modifier = Modifier.size(24.dp)
                 )
             }
+
+            Icon(
+                imageVector = icon,
+                contentDescription = title,
+                tint = BrightWhite,
+                modifier = Modifier.size(39.dp)
+            )
         }
 
-        Spacer(
-            modifier = Modifier.height(5.dp)
-        )
+        Spacer(modifier = Modifier.height(7.dp))
 
-        androidx.compose.material3.Text(
-            text = label,
+        Text(
+            text = title,
             color = BrightWhite,
-            fontSize = 9.sp,
+            fontSize = 17.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 1.5.sp
         )
