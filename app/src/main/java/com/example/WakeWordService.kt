@@ -95,7 +95,7 @@ class WakeWordService : Service() {
         createNotificationChannel()
 
         ttsManager =
-            TtsManager(this)
+            TtsManager.getInstance(this)
 
         commandExecutor =
             VisionCommandExecutor(this)
@@ -1102,7 +1102,6 @@ class WakeWordService : Service() {
         voiceController = null
 
         try {
-            ttsManager?.shutdown()
         } catch (_: Exception) {
         }
 
