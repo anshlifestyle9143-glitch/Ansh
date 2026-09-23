@@ -191,12 +191,15 @@ fun VisionApp(
 
             showVoiceCall -> {
 
-                showVoiceCall = false
+    showVoiceCall = false
 
-                if (wakeWordEnabled) {
-                    viewModel.startWakeWordService()
-                }
-            }
+    currentTab = VisionTab.HOME
+    autoStartChatVoice = false
+
+    if (wakeWordEnabled) {
+        viewModel.startWakeWordService()
+    }
+}
 
             showHistorySheet -> {
                 showHistorySheet = false
