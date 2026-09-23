@@ -274,6 +274,17 @@ fun ChatScreen(
 
 
 @Composable
+fun EmptyChatGuide(
+    activeEngine: AiEngineType,
+    onPromptClick: (String) -> Unit
+) {
+    Spacer(
+        modifier = Modifier.fillMaxSize()
+    )
+}
+
+
+@Composable
 fun ThinkingIndicator(
     engine: AiEngineType
 ) {
