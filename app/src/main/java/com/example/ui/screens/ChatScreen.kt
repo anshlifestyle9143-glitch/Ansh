@@ -274,62 +274,6 @@ fun ChatScreen(
 
 
 @Composable
-fun EmptyChatGuide(
-    activeEngine: AiEngineType,
-    onPromptClick: (String) -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-
-        Box(
-            modifier = Modifier
-                .size(68.dp)
-                .clip(CircleShape)
-                .background(VisionDeepPlum),
-            contentAlignment = Alignment.Center
-        ) {
-
-            Icon(
-                imageVector = Icons.Default.AutoAwesome,
-                contentDescription = "Vision AI",
-                tint = Color.White,
-                modifier = Modifier.size(34.dp)
-            )
-        }
-
-        Spacer(
-            modifier = Modifier.height(16.dp)
-        )
-
-        Text(
-            text = "Vision AI Assistant",
-            style = MaterialTheme.typography.displayMedium,
-            fontFamily = FontFamily.Serif,
-            fontStyle = FontStyle.Italic,
-            fontWeight = FontWeight.SemiBold,
-            color = VisionDeepPlum
-        )
-
-        Text(
-            text = "Engineered by Ansh Yadav with modular neural intelligence and persistent local memory vault.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = VisionTextSecondary,
-            modifier = Modifier.padding(
-                horizontal = 16.dp,
-                vertical = 6.dp
-            ),
-            textAlign = TextAlign.Center
-        )
-    }
-}
-
-
-@Composable
 fun ThinkingIndicator(
     engine: AiEngineType
 ) {
