@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -35,8 +36,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -53,9 +56,11 @@ import com.example.ui.viewmodel.VisionViewModel
 
 private val VisionBlack = Color(0xFF02050D)
 private val NeonBlue = Color(0xFF00D2FF)
+private val NeonCyan = Color(0xFF00E7FF)
 private val ElectricBlue = Color(0xFF0066FF)
 private val MutedTextBlue = Color(0xFF6B7C96)
 private val BrightWhite = Color(0xFFFFFFFF)
+
 
 // ================================================================
 // DASHBOARD SCREEN
@@ -138,6 +143,7 @@ fun DashboardScreen(
                             ),
                         contentAlignment = Alignment.Center
                     ) {
+
                         Text(
                             text = "V",
                             color = NeonBlue,
@@ -184,6 +190,7 @@ fun DashboardScreen(
                         vertical = 6.dp
                     )
             ) {
+
                 Text(
                     text = "Vision Core",
                     color = ElectricBlue,
@@ -193,8 +200,9 @@ fun DashboardScreen(
             }
         }
 
+
         // ========================================================
-        // SYSTEM LIVE
+        // SYSTEM LIVE STATUS
         // ========================================================
 
         Column(
@@ -255,8 +263,9 @@ fun DashboardScreen(
             )
         }
 
+
         // ========================================================
-        // CENTRAL HUB
+        // CENTRAL HUB & ORBITAL BUTTONS
         // ========================================================
 
         Box(
@@ -267,33 +276,49 @@ fun DashboardScreen(
         ) {
 
             // ====================================================
-            // ORBITAL CIRCLES
+            // BACKGROUND NEON CIRCLES
             // ====================================================
 
             Canvas(
                 modifier = Modifier.fillMaxSize()
             ) {
 
+                val cx = size.width / 2f
+                val cy = size.height / 2f
+
+                // Outer circle
+
                 drawCircle(
                     color = ElectricBlue.copy(
-                        alpha = 0.20f
+                        alpha = 0.2f
                     ),
                     radius = 150.dp.toPx(),
+                    center = androidx.compose.ui.geometry.Offset(
+                        cx,
+                        cy
+                    ),
                     style = Stroke(
                         width = 1.dp.toPx()
                     )
                 )
 
+                // Inner circle
+
                 drawCircle(
                     color = ElectricBlue.copy(
-                        alpha = 0.30f
+                        alpha = 0.3f
                     ),
                     radius = 115.dp.toPx(),
+                    center = androidx.compose.ui.geometry.Offset(
+                        cx,
+                        cy
+                    ),
                     style = Stroke(
                         width = 1.5.dp.toPx()
                     )
                 )
             }
+
 
             // ====================================================
             // CENTRAL CORE
@@ -302,10 +327,28 @@ fun DashboardScreen(
             Box(
                 modifier = Modifier
                     .size(150.dp)
-                    .graphicsLayer(
-                        scaleX = pulse,
+                    .graphicsLayer {
+                        scaleX = pulse
                         scaleY = pulse
-                    )
+                    }
+                    .drawBehind {
+
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                colors = listOf(
+                                    NeonBlue.copy(
+                                        alpha = 0.7f * glow
+                                    ),
+                                    ElectricBlue.copy(
+                                        alpha = 0.4f * glow
+                                    ),
+                                    Color.Transparent
+                                ),
+                                radius = size.minDimension * 0.9f
+                            ),
+                            radius = size.minDimension * 0.9f
+                        )
+                    }
                     .clip(CircleShape)
                     .background(
                         Brush.radialGradient(
@@ -316,13 +359,6 @@ fun DashboardScreen(
                             ),
                             radius = 260f
                         )
-                    )
-                    .border(
-                        width = 1.dp,
-                        color = NeonBlue.copy(
-                            alpha = glow
-                        ),
-                        shape = CircleShape
                     ),
                 contentAlignment = Alignment.Center
             ) {
@@ -335,8 +371,9 @@ fun DashboardScreen(
                 )
             }
 
+
             // ====================================================
-            // CHAT
+            // CHAT - TOP
             // ====================================================
 
             DashboardAction(
@@ -351,8 +388,9 @@ fun DashboardScreen(
                 }
             )
 
+
             // ====================================================
-            // VOICE TEXT
+            // VOICE - RIGHT
             // ====================================================
 
             DashboardAction(
@@ -367,8 +405,9 @@ fun DashboardScreen(
                 }
             )
 
+
             // ====================================================
-            // HISTORY
+            // HISTORY - BOTTOM
             // ====================================================
 
             DashboardAction(
@@ -380,8 +419,9 @@ fun DashboardScreen(
                 onClick = onShowHistory
             )
 
+
             // ====================================================
-            // SETTINGS
+            // SETTINGS - LEFT
             // ====================================================
 
             DashboardAction(
@@ -395,6 +435,7 @@ fun DashboardScreen(
                 }
             )
         }
+
 
         // ========================================================
         // FOOTER
@@ -442,6 +483,7 @@ fun DashboardScreen(
     }
 }
 
+
 // ================================================================
 // DASHBOARD ACTION BUTTON
 // ================================================================
@@ -455,9 +497,9 @@ private fun DashboardAction(
 ) {
 
     Column(
-        modifier = modifier.clickable(
-            onClick = onClick
-        ),
+        modifier = modifier.clickable {
+            onClick()
+        },
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
 
