@@ -34,11 +34,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.clip
-import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Stroke
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -47,11 +47,19 @@ import androidx.compose.ui.unit.sp
 import com.example.ui.components.VisionTab
 import com.example.ui.viewmodel.VisionViewModel
 
+// ================================================================
+// COLORS
+// ================================================================
+
 private val VisionBlack = Color(0xFF02050D)
 private val NeonBlue = Color(0xFF00D2FF)
 private val ElectricBlue = Color(0xFF0066FF)
 private val MutedTextBlue = Color(0xFF6B7C96)
-private val BrightWhite = Color.White
+private val BrightWhite = Color(0xFFFFFFFF)
+
+// ================================================================
+// DASHBOARD SCREEN
+// ================================================================
 
 @Composable
 fun DashboardScreen(
@@ -62,6 +70,7 @@ fun DashboardScreen(
     onShowHistory: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+
     val infinite = rememberInfiniteTransition(
         label = "vision_dashboard"
     )
@@ -123,9 +132,9 @@ fun DashboardScreen(
                         modifier = Modifier
                             .size(24.dp)
                             .border(
-                                width = 1.5.dp,
-                                color = NeonBlue,
-                                shape = CircleShape
+                                1.5.dp,
+                                NeonBlue,
+                                CircleShape
                             ),
                         contentAlignment = Alignment.Center
                     ) {
@@ -185,7 +194,7 @@ fun DashboardScreen(
         }
 
         // ========================================================
-        // SYSTEM LIVE STATUS
+        // SYSTEM LIVE
         // ========================================================
 
         Column(
@@ -198,9 +207,9 @@ fun DashboardScreen(
             Box(
                 modifier = Modifier
                     .border(
-                        width = 1.dp,
-                        color = Color(0xFF00E676),
-                        shape = RoundedCornerShape(20.dp)
+                        1.dp,
+                        Color(0xFF00E676),
+                        RoundedCornerShape(20.dp)
                     )
                     .padding(
                         horizontal = 16.dp,
@@ -287,34 +296,16 @@ fun DashboardScreen(
             }
 
             // ====================================================
-            // CENTRAL VISION CORE
+            // CENTRAL CORE
             // ====================================================
 
             Box(
                 modifier = Modifier
                     .size(150.dp)
-                    .graphicsLayer {
-                        scaleX = pulse
+                    .graphicsLayer(
+                        scaleX = pulse,
                         scaleY = pulse
-                    }
-                    .drawBehind {
-
-                        drawCircle(
-                            brush = Brush.radialGradient(
-                                colors = listOf(
-                                    NeonBlue.copy(
-                                        alpha = 0.70f * glow
-                                    ),
-                                    ElectricBlue.copy(
-                                        alpha = 0.40f * glow
-                                    ),
-                                    Color.Transparent
-                                ),
-                                radius = size.minDimension * 0.9f
-                            ),
-                            radius = size.minDimension * 0.9f
-                        )
-                    }
+                    )
                     .clip(CircleShape)
                     .background(
                         Brush.radialGradient(
@@ -325,6 +316,13 @@ fun DashboardScreen(
                             ),
                             radius = 260f
                         )
+                    )
+                    .border(
+                        width = 1.dp,
+                        color = NeonBlue.copy(
+                            alpha = glow
+                        ),
+                        shape = CircleShape
                     ),
                 contentAlignment = Alignment.Center
             ) {
@@ -338,7 +336,7 @@ fun DashboardScreen(
             }
 
             // ====================================================
-            // CHAT - TOP
+            // CHAT
             // ====================================================
 
             DashboardAction(
@@ -354,7 +352,7 @@ fun DashboardScreen(
             )
 
             // ====================================================
-            // VOICE TEXT - RIGHT
+            // VOICE TEXT
             // ====================================================
 
             DashboardAction(
@@ -370,7 +368,7 @@ fun DashboardScreen(
             )
 
             // ====================================================
-            // HISTORY - BOTTOM
+            // HISTORY
             // ====================================================
 
             DashboardAction(
@@ -383,7 +381,7 @@ fun DashboardScreen(
             )
 
             // ====================================================
-            // SETTINGS - LEFT
+            // SETTINGS
             // ====================================================
 
             DashboardAction(
@@ -455,6 +453,7 @@ private fun DashboardAction(
     title: String,
     onClick: () -> Unit
 ) {
+
     Column(
         modifier = modifier.clickable(
             onClick = onClick
@@ -470,11 +469,9 @@ private fun DashboardAction(
                     Color(0xFF050E1E)
                 )
                 .border(
-                    width = 1.5.dp,
-                    color = NeonBlue.copy(
-                        alpha = 0.8f
-                    ),
-                    shape = CircleShape
+                    1.5.dp,
+                    NeonBlue.copy(alpha = 0.8f),
+                    CircleShape
                 ),
             contentAlignment = Alignment.Center
         ) {
