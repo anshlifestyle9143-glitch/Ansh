@@ -119,7 +119,7 @@ fun DashboardScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(2.dp, 0.dp, 0.dp, 0.dp)
+                .padding(start = 2.dp, top = 2.dp)
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -442,7 +442,7 @@ fun DashboardScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.BottomCenter)
-                .padding(24.dp, 0.dp, 24.dp, 28.dp)
+                .padding(horizontal = 24.dp, bottom = 28.dp)
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.Bottom
         ) {
