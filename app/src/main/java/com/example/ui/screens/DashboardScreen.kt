@@ -1,3 +1,4 @@
+
 package com.example.ui.screens
 
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -35,7 +36,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.background
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
@@ -53,7 +53,6 @@ import com.example.ui.components.VisionTab
 import com.example.ui.viewmodel.VisionViewModel
 import kotlin.math.cos
 import kotlin.math.sin
-import androidx.compose.foundation.background
 
 // ================================================================
 // NEW DESIGN COLORS
