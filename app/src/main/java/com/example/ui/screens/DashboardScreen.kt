@@ -117,12 +117,17 @@ fun DashboardScreen(
         // ========================================================
 
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 2.dp, top = 2.dp)
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+             Text(
+    text = "BY ANSH YADAV",
+    color = MutedTextBlue,
+    fontSize = 10.sp,
+    fontWeight = FontWeight.SemiBold,
+    letterSpacing = 1.5.sp,
+    modifier = Modifier.padding(
+        start = 2.dp,
+        top = 2.dp
+    )
+)
 
             Column {
 
@@ -439,13 +444,16 @@ fun DashboardScreen(
         // ========================================================
 
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.BottomCenter)
-                .padding(horizontal = 24.dp, bottom = 28.dp)
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Bottom
-        ) {
+    modifier = Modifier
+        .fillMaxWidth()
+        .align(Alignment.BottomCenter)
+        .padding(
+            horizontal = 24.dp,
+            bottom = 28.dp
+        ),
+    horizontalArrangement = Arrangement.SpaceBetween,
+    verticalAlignment = Alignment.Bottom
+) {
 
             Column {
 
