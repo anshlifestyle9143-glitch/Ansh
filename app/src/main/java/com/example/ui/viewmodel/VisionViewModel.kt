@@ -34,7 +34,7 @@ class VisionViewModel(application: Application) : AndroidViewModel(application) 
     private val repository =
         VisionRepository(database.visionDao(), application)
 
-    val ttsManager = TtsManager(application)
+    val ttsManager = TtsManager.getInstance(application)
 
     /*
      * ---------------------------------------------------------
@@ -629,8 +629,6 @@ class VisionViewModel(application: Application) : AndroidViewModel(application) 
          * ViewModel can be recreated while the application is
          * still alive. Wake Word should continue independently.
          */
-
-        ttsManager.shutdown()
 
         super.onCleared()
     }
