@@ -153,11 +153,9 @@ Box(
 
     Row(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(
-                horizontal = 24.dp,
-                top = 28.dp
-            ),
+    .fillMaxWidth()
+    .padding(24.dp)
+    .padding(top = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -821,10 +819,8 @@ Box(
         modifier = Modifier
             .fillMaxWidth()
             .align(Alignment.BottomCenter)
-            .padding(
-                horizontal = 24.dp,
-                bottom = 28.dp
-            ),
+            .padding(24.dp)
+.padding(bottom = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.Bottom
     ) {
