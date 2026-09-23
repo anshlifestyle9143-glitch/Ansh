@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import java.util.Locale
 
-class TtsManager(context: Context) : TextToSpeech.OnInitListener {
+class TtsManager private constructor(context: Context) : TextToSpeech.OnInitListener {
 
     private var tts: TextToSpeech? = TextToSpeech(context.applicationContext, this)
     private var isInitialized = false
@@ -40,8 +40,6 @@ class TtsManager(context: Context) : TextToSpeech.OnInitListener {
 
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
-            // Vision bolti Hinglish hai — Hindi locale try karo pehle,
-            // taaki VoxSherpa jaisi engine apni Hindi/Kokoro voice de sake.
             val hindiResult = tts?.setLanguage(Locale("hi", "IN"))
             val usable = hindiResult != TextToSpeech.LANG_MISSING_DATA &&
                 hindiResult != TextToSpeech.LANG_NOT_SUPPORTED
@@ -72,7 +70,6 @@ class TtsManager(context: Context) : TextToSpeech.OnInitListener {
         }
 
         stop()
-        // Strip markdown characters for cleaner speech synthesis
         val cleanText = text
             .replace(Regex("```[\\s\\S]*?```"), " Code block omitted. ")
             .replace(Regex("[#*`_]"), "")
@@ -92,5 +89,16 @@ class TtsManager(context: Context) : TextToSpeech.OnInitListener {
         tts?.stop()
         tts?.shutdown()
         tts = null
+    }
+
+    companion object {
+        @Volatile
+        private var INSTANCE: TtsManager? = null
+
+        fun getInstance(context: Context): TtsManager {
+            return INSTANCE ?: synchronized(this) {
+                INSTANCE ?: TtsManager(context.applicationContext).also { INSTANCE = it }
+            }
+        }
     }
 }
