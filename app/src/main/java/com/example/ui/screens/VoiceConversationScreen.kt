@@ -413,6 +413,7 @@ fun VoiceConversationScreen(
         ) {}
 
     LaunchedEffect(Unit) {
+        val neededPermissions = mutableListOf<String>()
 
         if (
             ContextCompat.checkSelfPermission(
@@ -420,10 +421,29 @@ fun VoiceConversationScreen(
                 Manifest.permission.CAMERA
             ) != PackageManager.PERMISSION_GRANTED
         ) {
+            neededPermissions.add(Manifest.permission.CAMERA)
+        }
 
-            cameraPermissionLauncher.launch(
-                Manifest.permission.CAMERA
-            )
+        if (
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.CALL_PHONE
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            neededPermissions.add(Manifest.permission.CALL_PHONE)
+        }
+
+        if (
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.READ_CONTACTS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            neededPermissions.add(Manifest.permission.READ_CONTACTS)
+        }
+
+        neededPermissions.forEach { permission ->
+            cameraPermissionLauncher.launch(permission)
         }
     }
 
