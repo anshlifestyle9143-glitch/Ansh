@@ -1,8 +1,11 @@
 package com.example.service
 
 import android.content.Context
+import android.content.Intent
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
+import android.net.Uri
+import android.provider.ContactsContract
 import android.util.Log
 import com.example.data.api.GeminiContent
 import com.example.data.api.GeminiGenerationConfig
@@ -18,15 +21,6 @@ import org.json.JSONObject
  *
  * IMPORTANT:
  * This executor does NOT use keyword matching.
- *
- * Example:
- * "Phone ki torch jala do"
- * "Light on kar do"
- * "Andhera hai, light chalu karo"
- * "Turn on the flashlight"
- *
- * All can semantically resolve to:
- * FLASHLIGHT -> ON
  */
 class VisionCommandExecutor(
     private val context: Context
@@ -37,6 +31,7 @@ class VisionCommandExecutor(
         private const val MODEL = "gemini-3.5-flash-lite"
 
         private const val FLASHLIGHT = "FLASHLIGHT"
+        private const val CALL = "CALL"
         private const val ON = "ON"
         private const val OFF = "OFF"
         private const val UNKNOWN = "UNKNOWN"
@@ -50,15 +45,10 @@ class VisionCommandExecutor(
 
     private data class ParsedCommand(
         val action: String,
-        val state: String
+        val state: String = UNKNOWN,
+        val target: String = ""
     )
 
-    /**
-     * Execute a natural-language device command.
-     *
-     * Semantic understanding is handled by Gemini.
-     * No fixed phrase/keyword matching is used.
-     */
     suspend fun execute(text: String): CommandResult =
         withContext(Dispatchers.IO) {
 
@@ -76,7 +66,7 @@ class VisionCommandExecutor(
 
             Log.d(
                 TAG,
-                "Parsed command: action=${parsed.action}, state=${parsed.state}"
+                "Parsed command: action=${parsed.action}, state=${parsed.state}, target=${parsed.target}"
             )
 
             when (parsed.action) {
@@ -94,6 +84,10 @@ class VisionCommandExecutor(
                     }
                 }
 
+                CALL -> {
+                    makeCall(parsed.target)
+                }
+
                 else -> {
                     CommandResult(
                         success = false,
@@ -104,11 +98,6 @@ class VisionCommandExecutor(
             }
         }
 
-    /**
-     * Converts natural language into a structured device command.
-     *
-     * This is semantic understanding, not keyword detection.
-     */
     private suspend fun parseCommand(
         text: String
     ): ParsedCommand = withContext(Dispatchers.IO) {
@@ -119,15 +108,9 @@ class VisionCommandExecutor(
             apiKey.isBlank() ||
             apiKey == "MY_GEMINI_API_KEY"
         ) {
-            Log.w(
-                TAG,
-                "Gemini API key unavailable"
-            )
+            Log.w(TAG, "Gemini API key unavailable")
 
-            return@withContext ParsedCommand(
-                action = UNKNOWN,
-                state = UNKNOWN
-            )
+            return@withContext ParsedCommand(action = UNKNOWN)
         }
 
         val instruction = """
@@ -138,39 +121,37 @@ class VisionCommandExecutor(
             Do NOT use simple keyword matching.
             Understand Hindi, Hinglish and English naturally.
 
-            Your job is to determine whether the user wants
-            a supported device action.
+            Currently supported actions:
 
-            Currently supported action:
+            1) FLASHLIGHT
+               states: ON, OFF
 
-            FLASHLIGHT
-
-            FLASHLIGHT states:
-
-            ON
-            OFF
+            2) CALL
+               target: the contact's name exactly as the user said it
+               (e.g. "Mummy", "Rahul", "Papa")
 
             Return ONLY valid JSON.
 
-            Required format:
-
+            For flashlight:
             {
               "action": "FLASHLIGHT",
               "state": "ON"
             }
-
-            or:
-
+            or
             {
               "action": "FLASHLIGHT",
               "state": "OFF"
             }
 
-            If the request is not a supported device action:
-
+            For calling:
             {
-              "action": "UNKNOWN",
-              "state": "UNKNOWN"
+              "action": "CALL",
+              "target": "Mummy"
+            }
+
+            If the request is not a supported device action:
+            {
+              "action": "UNKNOWN"
             }
 
             Examples:
@@ -178,32 +159,23 @@ class VisionCommandExecutor(
             "Phone ki torch jala do"
             -> {"action":"FLASHLIGHT","state":"ON"}
 
-            "Light on kar do"
-            -> {"action":"FLASHLIGHT","state":"ON"}
-
-            "Andhera hai, light chalu kar do"
-            -> {"action":"FLASHLIGHT","state":"ON"}
-
-            "Turn on the flashlight"
-            -> {"action":"FLASHLIGHT","state":"ON"}
-
             "Torch band kar do"
             -> {"action":"FLASHLIGHT","state":"OFF"}
 
-            "Flashlight off karo"
-            -> {"action":"FLASHLIGHT","state":"OFF"}
-
-            "Turn off the phone flash"
-            -> {"action":"FLASHLIGHT","state":"OFF"}
-
             "Mummy ko call laga do"
-            -> {"action":"UNKNOWN","state":"UNKNOWN"}
+            -> {"action":"CALL","target":"Mummy"}
+
+            "Rahul ko phone lagao"
+            -> {"action":"CALL","target":"Rahul"}
+
+            "Papa ko call karo"
+            -> {"action":"CALL","target":"Papa"}
 
             "YouTube par Arijit Singh ke gaane chalao"
-            -> {"action":"UNKNOWN","state":"UNKNOWN"}
+            -> {"action":"UNKNOWN"}
 
             "Kaise ho?"
-            -> {"action":"UNKNOWN","state":"UNKNOWN"}
+            -> {"action":"UNKNOWN"}
 
             User command:
             $text
@@ -213,18 +185,14 @@ class VisionCommandExecutor(
             contents = listOf(
                 GeminiContent(
                     role = "user",
-                    parts = listOf(
-                        GeminiPart(
-                            text = instruction
-                        )
-                    )
+                    parts = listOf(GeminiPart(text = instruction))
                 )
             ),
             generationConfig = GeminiGenerationConfig(
                 temperature = 0.0f,
                 topP = 1.0f,
                 topK = 1,
-                maxOutputTokens = 40
+                maxOutputTokens = 60
             )
         )
 
@@ -238,8 +206,7 @@ class VisionCommandExecutor(
                 )
 
             val raw =
-                response
-                    .candidates
+                response.candidates
                     ?.firstOrNull()
                     ?.content
                     ?.parts
@@ -248,34 +215,19 @@ class VisionCommandExecutor(
                     ?.trim()
                     ?: ""
 
-            Log.d(
-                TAG,
-                "Raw command parser response: $raw"
-            )
+            Log.d(TAG, "Raw command parser response: $raw")
 
             parseJsonResponse(raw)
 
         } catch (e: Exception) {
 
-            Log.e(
-                TAG,
-                "Command parsing failed",
-                e
-            )
+            Log.e(TAG, "Command parsing failed", e)
 
-            ParsedCommand(
-                action = UNKNOWN,
-                state = UNKNOWN
-            )
+            ParsedCommand(action = UNKNOWN)
         }
     }
 
-    /**
-     * Safely extracts structured command information.
-     */
-    private fun parseJsonResponse(
-        raw: String
-    ): ParsedCommand {
+    private fun parseJsonResponse(raw: String): ParsedCommand {
 
         return try {
 
@@ -287,63 +239,43 @@ class VisionCommandExecutor(
             val json = JSONObject(cleaned)
 
             val action =
-                json.optString(
-                    "action",
-                    UNKNOWN
-                ).uppercase()
+                json.optString("action", UNKNOWN).uppercase()
 
-            val state =
-                json.optString(
-                    "state",
-                    UNKNOWN
-                ).uppercase()
+            when (action) {
 
-            when {
-                action == FLASHLIGHT &&
-                    state == ON -> {
-                    ParsedCommand(
-                        action = FLASHLIGHT,
-                        state = ON
-                    )
+                FLASHLIGHT -> {
+                    val state =
+                        json.optString("state", UNKNOWN).uppercase()
+
+                    if (state == ON || state == OFF) {
+                        ParsedCommand(action = FLASHLIGHT, state = state)
+                    } else {
+                        ParsedCommand(action = UNKNOWN)
+                    }
                 }
 
-                action == FLASHLIGHT &&
-                    state == OFF -> {
-                    ParsedCommand(
-                        action = FLASHLIGHT,
-                        state = OFF
-                    )
+                CALL -> {
+                    val target = json.optString("target", "").trim()
+
+                    if (target.isNotBlank()) {
+                        ParsedCommand(action = CALL, target = target)
+                    } else {
+                        ParsedCommand(action = UNKNOWN)
+                    }
                 }
 
-                else -> {
-                    ParsedCommand(
-                        action = UNKNOWN,
-                        state = UNKNOWN
-                    )
-                }
+                else -> ParsedCommand(action = UNKNOWN)
             }
 
         } catch (e: Exception) {
 
-            Log.e(
-                TAG,
-                "Invalid command JSON",
-                e
-            )
+            Log.e(TAG, "Invalid command JSON", e)
 
-            ParsedCommand(
-                action = UNKNOWN,
-                state = UNKNOWN
-            )
+            ParsedCommand(action = UNKNOWN)
         }
     }
 
-    /**
-     * Controls the physical phone flashlight.
-     */
-    private fun setFlashlight(
-        enabled: Boolean
-    ): CommandResult {
+    private fun setFlashlight(enabled: Boolean): CommandResult {
 
         val hasPermission =
             androidx.core.content.ContextCompat.checkSelfPermission(
@@ -362,15 +294,12 @@ class VisionCommandExecutor(
         return try {
 
             val cameraManager =
-                context.getSystemService(
-                    Context.CAMERA_SERVICE
-                ) as CameraManager
+                context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
 
             val cameraId =
                 cameraManager.cameraIdList.firstOrNull { id ->
 
-                    val characteristics =
-                        cameraManager.getCameraCharacteristics(id)
+                    val characteristics = cameraManager.getCameraCharacteristics(id)
 
                     val hasFlash = characteristics.get(
                         CameraCharacteristics.FLASH_INFO_AVAILABLE
@@ -384,8 +313,7 @@ class VisionCommandExecutor(
 
                 } ?: cameraManager.cameraIdList.firstOrNull { id ->
 
-                    val characteristics =
-                        cameraManager.getCameraCharacteristics(id)
+                    val characteristics = cameraManager.getCameraCharacteristics(id)
 
                     characteristics.get(
                         CameraCharacteristics.FLASH_INFO_AVAILABLE
@@ -393,7 +321,6 @@ class VisionCommandExecutor(
                 }
 
             if (cameraId == null) {
-
                 return CommandResult(
                     success = false,
                     action = FLASHLIGHT,
@@ -401,9 +328,6 @@ class VisionCommandExecutor(
                 )
             }
 
-            // MediaTek/Tecno jaise kuch devices pe pehli call
-            // "success" return karti hai par hardware turant
-            // respond nahi karta — isliye ek chhota retry.
             try {
                 cameraManager.setTorchMode(cameraId, enabled)
             } catch (e: Exception) {
@@ -415,20 +339,9 @@ class VisionCommandExecutor(
             cameraManager.setTorchMode(cameraId, enabled)
 
             if (enabled) {
-
-                CommandResult(
-                    success = true,
-                    action = FLASHLIGHT,
-                    message = "Flashlight on kar di Boss."
-                )
-
+                CommandResult(success = true, action = FLASHLIGHT, message = "Flashlight on kar di Boss.")
             } else {
-
-                CommandResult(
-                    success = true,
-                    action = FLASHLIGHT,
-                    message = "Flashlight off kar di Boss."
-                )
+                CommandResult(success = true, action = FLASHLIGHT, message = "Flashlight off kar di Boss.")
             }
 
         } catch (e: SecurityException) {
@@ -441,7 +354,7 @@ class VisionCommandExecutor(
                 message = "Boss, flashlight control karne ki permission nahi mili."
             )
 
-                } catch (e: Exception) {
+        } catch (e: Exception) {
 
             Log.e(TAG, "Flashlight execution failed", e)
 
@@ -450,6 +363,127 @@ class VisionCommandExecutor(
                 action = FLASHLIGHT,
                 message = "Boss, flashlight control nahi ho payi."
             )
+        }
+    }
+
+    /**
+     * Looks up the contact by name and places a direct call.
+     */
+    private fun makeCall(contactName: String): CommandResult {
+
+        if (contactName.isBlank()) {
+            return CommandResult(
+                success = false,
+                action = CALL,
+                message = "Boss, kisko call karna hai, naam bataiye."
+            )
+        }
+
+        val hasCallPermission =
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.CALL_PHONE
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+        val hasContactsPermission =
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.READ_CONTACTS
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+        if (!hasCallPermission || !hasContactsPermission) {
+            return CommandResult(
+                success = false,
+                action = CALL,
+                message = "Boss, call aur contacts ki permission nahi mili. App kholke pehle allow karo."
+            )
+        }
+
+        val phoneNumber = findContactNumber(contactName)
+
+        if (phoneNumber == null) {
+            return CommandResult(
+                success = false,
+                action = CALL,
+                message = "Boss, \"$contactName\" naam ka contact nahi mila."
+            )
+        }
+
+        return try {
+
+            val intent = Intent(Intent.ACTION_CALL).apply {
+                data = Uri.parse("tel:$phoneNumber")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+
+            context.startActivity(intent)
+
+            CommandResult(
+                success = true,
+                action = CALL,
+                message = "$contactName ko call laga rahi hoon, Boss."
+            )
+
+        } catch (e: SecurityException) {
+
+            Log.e(TAG, "Call permission/security error", e)
+
+            CommandResult(
+                success = false,
+                action = CALL,
+                message = "Boss, call lagane ki permission nahi mili."
+            )
+
+        } catch (e: Exception) {
+
+            Log.e(TAG, "Call failed", e)
+
+            CommandResult(
+                success = false,
+                action = CALL,
+                message = "Boss, call lagane me problem aa gayi."
+            )
+        }
+    }
+
+    private fun findContactNumber(name: String): String? {
+
+        return try {
+
+            val resolver = context.contentResolver
+
+            val uri = ContactsContract.CommonDataKinds.Phone.CONTENT_URI
+
+            val projection = arrayOf(
+                ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+                ContactsContract.CommonDataKinds.Phone.NUMBER
+            )
+
+            val selection =
+                "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} LIKE ?"
+
+            val selectionArgs = arrayOf("%$name%")
+
+            resolver.query(uri, projection, selection, selectionArgs, null)?.use { cursor ->
+
+                if (cursor.moveToFirst()) {
+
+                    val numberIndex = cursor.getColumnIndex(
+                        ContactsContract.CommonDataKinds.Phone.NUMBER
+                    )
+
+                    if (numberIndex >= 0) cursor.getString(numberIndex) else null
+
+                } else {
+                    null
+                }
+            }
+
+        } catch (e: Exception) {
+
+            Log.e(TAG, "Contact lookup failed", e)
+
+            null
         }
     }
 }
