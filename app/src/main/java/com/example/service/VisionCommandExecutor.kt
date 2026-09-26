@@ -16,12 +16,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
-/**
- * Executes commands that have already been classified as ACTION.
- *
- * IMPORTANT:
- * This executor does NOT use keyword matching.
- */
 class VisionCommandExecutor(
     private val context: Context
 ) {
@@ -104,12 +98,8 @@ class VisionCommandExecutor(
 
         val apiKey = VisionRetrofitClient.getCommandApiKey()
 
-        if (
-            apiKey.isBlank() ||
-            apiKey == "MY_GEMINI_API_KEY"
-        ) {
+        if (apiKey.isBlank() || apiKey == "MY_GEMINI_API_KEY") {
             Log.w(TAG, "Gemini API key unavailable")
-
             return@withContext ParsedCommand(action = UNKNOWN)
         }
 
@@ -366,10 +356,7 @@ class VisionCommandExecutor(
         }
     }
 
-    /**
-     * Looks up the contact by name and places a direct call.
-     */
-    private fun makeCall(contactName: String): CommandResult {
+    private suspend fun makeCall(contactName: String): CommandResult {
 
         if (contactName.isBlank()) {
             return CommandResult(
@@ -399,15 +386,39 @@ class VisionCommandExecutor(
             )
         }
 
-        val phoneNumber = findContactNumber(contactName)
+        val allContacts = fetchAllContacts()
 
-        if (phoneNumber == null) {
+        if (allContacts.isEmpty()) {
+            return CommandResult(
+                success = false,
+                action = CALL,
+                message = "Boss, phone me koi contact nahi mila."
+            )
+        }
+
+        val directMatch = allContacts.firstOrNull { (name, _) ->
+            name.contains(contactName, ignoreCase = true) ||
+                contactName.contains(name, ignoreCase = true)
+        }
+
+        val matched = directMatch ?: run {
+            val bestName = semanticContactMatch(
+                contactName,
+                allContacts.map { it.first }
+            )
+
+            allContacts.firstOrNull { it.first == bestName }
+        }
+
+        if (matched == null) {
             return CommandResult(
                 success = false,
                 action = CALL,
                 message = "Boss, \"$contactName\" naam ka contact nahi mila."
             )
         }
+
+        val (matchedName, phoneNumber) = matched
 
         return try {
 
@@ -421,7 +432,7 @@ class VisionCommandExecutor(
             CommandResult(
                 success = true,
                 action = CALL,
-                message = "$contactName ko call laga rahi hoon, Boss."
+                message = "$matchedName ko call laga rahi hoon, Boss."
             )
 
         } catch (e: SecurityException) {
@@ -446,7 +457,7 @@ class VisionCommandExecutor(
         }
     }
 
-    private fun findContactNumber(name: String): String? {
+    private fun fetchAllContacts(): List<Pair<String, String>> {
 
         return try {
 
@@ -459,29 +470,121 @@ class VisionCommandExecutor(
                 ContactsContract.CommonDataKinds.Phone.NUMBER
             )
 
-            val selection =
-                "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} LIKE ?"
+            val results = mutableListOf<Pair<String, String>>()
 
-            val selectionArgs = arrayOf("%$name%")
+            resolver.query(uri, projection, null, null, null)?.use { cursor ->
 
-            resolver.query(uri, projection, selection, selectionArgs, null)?.use { cursor ->
+                val nameIndex = cursor.getColumnIndex(
+                    ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME
+                )
 
-                if (cursor.moveToFirst()) {
+                val numberIndex = cursor.getColumnIndex(
+                    ContactsContract.CommonDataKinds.Phone.NUMBER
+                )
 
-                    val numberIndex = cursor.getColumnIndex(
-                        ContactsContract.CommonDataKinds.Phone.NUMBER
-                    )
+                if (nameIndex >= 0 && numberIndex >= 0) {
 
-                    if (numberIndex >= 0) cursor.getString(numberIndex) else null
+                    val seenNames = mutableSetOf<String>()
 
-                } else {
-                    null
+                    while (cursor.moveToNext()) {
+
+                        val name = cursor.getString(nameIndex) ?: continue
+                        val number = cursor.getString(numberIndex) ?: continue
+
+                        if (seenNames.add(name)) {
+                            results.add(name to number)
+                        }
+                    }
                 }
             }
 
+            results
+
         } catch (e: Exception) {
 
-            Log.e(TAG, "Contact lookup failed", e)
+            Log.e(TAG, "Contact list fetch failed", e)
+
+            emptyList()
+        }
+    }
+
+    private suspend fun semanticContactMatch(
+        target: String,
+        contactNames: List<String>
+    ): String? = withContext(Dispatchers.IO) {
+
+        val apiKey = VisionRetrofitClient.getCommandApiKey()
+
+        if (apiKey.isBlank() || apiKey == "MY_GEMINI_API_KEY") {
+            return@withContext null
+        }
+
+        val limitedNames = contactNames.take(400)
+
+        val instruction = """
+            The user wants to call someone. They said: "$target"
+
+            Here are their saved contact names, exactly as stored:
+
+            ${limitedNames.joinToString("\n")}
+
+            Rules:
+            - Family/relationship words in Hindi and English should
+              match each other (papa / pitaji / dad / father = पापा / पिताजी,
+              mama / mummy / mom / maa = मम्मी / मां / मम्मा, and similar).
+            - Ignore respectful honorific suffixes like "ji" / "जी".
+            - Match across Devanagari and Roman script by MEANING,
+              not spelling.
+            - Return ONLY one contact name, copied EXACTLY character
+              for character from the list above.
+            - If nothing reasonably matches, return exactly: NONE
+
+            Best matching contact name:
+        """.trimIndent()
+
+        val request = GeminiRequest(
+            contents = listOf(
+                GeminiContent(
+                    role = "user",
+                    parts = listOf(GeminiPart(text = instruction))
+                )
+            ),
+            generationConfig = GeminiGenerationConfig(
+                temperature = 0.0f,
+                topP = 1.0f,
+                topK = 1,
+                maxOutputTokens = 60
+            )
+        )
+
+        try {
+
+            val response =
+                VisionRetrofitClient.apiService.generateContent(
+                    model = MODEL,
+                    apiKey = apiKey,
+                    request = request
+                )
+
+            val raw =
+                response.candidates
+                    ?.firstOrNull()
+                    ?.content
+                    ?.parts
+                    ?.firstOrNull()
+                    ?.text
+                    ?.trim()
+                    ?: return@withContext null
+
+            Log.d(TAG, "Semantic contact match raw: $raw")
+
+            if (raw == "NONE") return@withContext null
+
+            limitedNames.firstOrNull { it == raw }
+
+        } catch (e: Exception) {
+
+            Log.e(TAG, "Semantic contact match failed", e)
 
             null
         }
